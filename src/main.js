@@ -1,12 +1,12 @@
 import { plan, gapsFor, facilityAt, SPEED_M_PER_MIN } from "./engine.js";
 import { SAMPLE_DATA } from "./data.js";
+import { fmtDist, fmtFeet, fmtMiles } from "./units.js";
 
 let DATA = SAMPLE_DATA;
 const $ = (id) => document.getElementById(id);
 const WORD = { E: "east", W: "west", N: "north", S: "south" };
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const round10 = (m) => Math.max(10, Math.round(m / 10) * 10);
 const short = (I) => I.short || I.name;
 const US = () => DATA.corridor.short || "the main road";
 let last = null;
@@ -47,27 +47,27 @@ function describe(r) {
       for (const note of a.notes) {
         if (note.kind === "gap") {
           flags.push(bike
-            ? { cls: "stop", text: `No sidewalk or bike lane for about ${round10(note.m)} m, so you'll be in the travel lane. Ride predictably and hold your line${dark ? ", with front and rear lights on" : ""}.` }
-            : { cls: "stop", text: `No sidewalk for about ${round10(note.m)} m. Stay as far from the travel lanes as you can${dark ? ", and it will be dark, so carry a light" : ""}.` });
+            ? { cls: "stop", text: `No sidewalk or bike lane for about ${fmtDist(note.m)}, so you'll be in the travel lane. Ride predictably and hold your line${dark ? ", with front and rear lights on" : ""}.` }
+            : { cls: "stop", text: `No sidewalk for about ${fmtDist(note.m)}. Stay as far from the travel lanes as you can${dark ? ", and it will be dark, so carry a light" : ""}.` });
         } else if (note.kind === "against") {
           flags.push({ cls: "stop", text: `This side runs against traffic for your direction. Walk your bike on the sidewalk here: drivers pulling out of driveways and side streets look left, away from you.` });
         } else if (note.kind === "noFacility") {
           const m = note.m - gapTotal; // the gap flag already covers stretches with no sidewalk either
           if (a.againstM || m < 20) continue;
-          flags.push({ cls: "warn", text: `No bike lane for about ${round10(m)} m. If you use the sidewalk, ride at walking speed and give pedestrians the right of way.` });
+          flags.push({ cls: "warn", text: `No bike lane for about ${fmtDist(m)}. If you use the sidewalk, ride at walking speed and give pedestrians the right of way.` });
         } else if (note.event.effect === "closed") {
-          flags.push({ cls: "warn", text: `${note.event.type}: ${note.event.desc}. Follow the posted ${bike ? "" : "pedestrian "}detour (${round10(note.m)} m affected).` });
+          flags.push({ cls: "warn", text: `${note.event.type}: ${note.event.desc}. Follow the posted ${bike ? "" : "pedestrian "}detour (${fmtDist(note.m)} affected).` });
         } else {
           flags.push({ cls: "warn", text: bike
             ? `${note.event.type}: ${note.event.desc}. The closure may take over the bike lane, so merge early and make yourself visible.`
             : `${note.event.type}: ${note.event.desc}. Equipment is right beside the sidewalk.` });
         }
       }
-      let title = `Walk ${round10(a.len)} m ${d} on the ${WORD[a.side]} sidewalk`;
-      if (bike && a.againstM) title = `Walk your bike ${round10(a.len)} m ${d} on the ${WORD[a.side]} sidewalk`;
+      let title = `Walk ${fmtDist(a.len)} ${d} on the ${WORD[a.side]} sidewalk`;
+      if (bike && a.againstM) title = `Walk your bike ${fmtDist(a.len)} ${d} on the ${WORD[a.side]} sidewalk`;
       else if (bike) {
         const fac = facilityAt(DATA, a.side, (a.from + a.to) / 2);
-        title = `Ride ${round10(a.len)} m ${d} on the ${WORD[a.side]} side${fac ? ` in the ${FAC_WORD[fac.type] || "bike lane"}` : ""}`;
+        title = `Ride ${fmtDist(a.len)} ${d} on the ${WORD[a.side]} side${fac ? ` in the ${FAC_WORD[fac.type] || "bike lane"}` : ""}`;
       }
       // Walking a bike goes at walking speed.
       steps.push({ badge: "", cls: "walk", title, why: `About ${minutesFor(a.len, bike && !a.againstM ? "bike" : "walk")} min.`, flags, act: a });
@@ -132,7 +132,7 @@ function corridorWhy(a, r) {
   } else {
     for (const g of gapsFor(DATA, a.from)) {
       const o = Math.max(0, Math.min(hi, g.to) - Math.max(lo, g.from));
-      if (o > 20) why.push(`a ${round10(o)} m sidewalk gap on the ${WORD[a.from]} side`);
+      if (o > 20) why.push(`a ${fmtDist(o)} sidewalk gap on the ${WORD[a.from]} side`);
     }
   }
   for (const e of r.activeEvents) {
@@ -261,33 +261,33 @@ function renderSummary(r, t, ctx) {
   }
   if (r.detour) headline = `Cross ${US()} at the signal, not mid-block.`;
   if (r.detour) body =`${r.dest.name} is across ${US()} on the same block. We send you to the nearest signalized crosswalk rather than having you cross mid-block.`;
-  const row = (label, a, b, unit) => {
-    const cls = b == null ? "" : a < b ? "better" : a > b ? "worse" : "";
-    return `<tr><td>${label}</td><td class="num ${cls}">${a}${unit || ""}</td><td class="num">${b == null ? "–" : b + (unit || "")}</td></tr>`;
+  // a and b are raw numbers (meters for distances) so the comparison is exact; fmt formats them.
+  const row = (label, a, b, fmt = String) => {
+    const cls = b == null ? "" : Math.round(a) < Math.round(b) ? "better" : Math.round(a) > Math.round(b) ? "worse" : "";
+    return `<tr><td>${label}</td><td class="num ${cls}">${fmt(a)}</td><td class="num">${b == null ? "–" : fmt(b)}</td></tr>`;
   };
   $("summary").innerHTML = `
     <div class="headline">${esc(headline)}</div>
     <div class="why" style="font-size:15px">${esc(body)}</div>
     <div class="meta">
-      <span class="chip">${(ex.distance / 1000).toFixed(1)} km · ~${minutes} min</span>
+      <span class="chip">${fmtDist(ex.distance)} · ~${minutes} min</span>
       <span class="chip">Arrive ~${arrTxt}</span>
       <span class="chip">${ex.crossings} crossing${ex.crossings === 1 ? "" : "s"}</span>
       ${ctx.dark ? `<span class="chip dark">🌙 Dark at this hour: ${bike ? "front and rear lights on" : "wear something bright"}</span>` : ""}
     </div>
     <table class="cmp">
       <tr><th>Exposure</th><th>Sightline route</th><th>Typical route*</th></tr>
-      ${bike ? row("Riding against traffic", round0(ex.againstM), tx && round0(tx.againstM), " m") : ""}
+      ${bike ? row("Riding against traffic", ex.againstM, tx && tx.againstM, fmtFeet) : ""}
       ${row("Crossings where right-on-red drivers look away", ex.blind, tx && tx.blind)}
       ${bike ? row("Right hooks from behind", ex.behind, tx && tx.behind) : ""}
-      ${row("Through active work zones", round0(ex.closedM + ex.adjM), tx && round0(tx.closedM + tx.adjM), " m")}
+      ${row("Through active work zones", ex.closedM + ex.adjM, tx && tx.closedM + tx.adjM, fmtFeet)}
       ${row("Corner work zones at crossings", ex.corner, tx && tx.corner)}
-      ${bike ? row("Riding with no bike lane or path", round0(ex.noFacilityM), tx && round0(tx.noFacilityM), " m") : ""}
-      ${row(bike ? "In traffic with no sidewalk or bike lane" : "Walking with no sidewalk", round0(ex.gapM), tx && round0(tx.gapM), " m")}
-      ${row("Total distance", round0(ex.distance), tx && round0(tx.distance), " m")}
+      ${bike ? row("Riding with no bike lane or path", ex.noFacilityM, tx && tx.noFacilityM, fmtFeet) : ""}
+      ${row(bike ? "In traffic with no sidewalk or bike lane" : "Walking with no sidewalk", ex.gapM, tx && tx.gapM, fmtFeet)}
+      ${row("Total distance", ex.distance, tx && tx.distance, fmtMiles)}
     </table>
     <div class="why" style="font-size:12.5px;margin-top:8px">*Typical route = the shortest ${bike ? "ride" : "walk"} that stays on your starting side and crosses only when it has to.</div>`;
 }
-const round0 = (x) => Math.round(x);
 
 function renderSteps(steps) {
   $("steps").innerHTML = steps.map((st, i) => `
@@ -426,7 +426,7 @@ async function ask(question) {
   if (ctrl) ctrl.abort();
   ctrl = new AbortController();
   const out = $("aiOut"); out.style.display = "block"; out.textContent = "Thinking…";
-  const sys = "You are Sightline, a safety assistant for people walking or biking to work along busy roads. The route data says which mode this trip uses. Use ONLY the route data provided; do not invent conditions, streets or times. Key rule: drivers turning right on red look left, so people are safest approaching from the driver's left. In U.S. traffic that means using the right-hand side for your direction of travel; for cyclists it also means never riding against traffic. Be warm, concrete and brief. Plain text, no markdown headers. If the data is marked as sample data, mention that once at the end in a short clause.";
+  const sys = "You are Sightline, a safety assistant for people walking or biking to work along busy roads. The route data says which mode this trip uses. Use ONLY the route data provided; do not invent conditions, streets or times. Key rule: drivers turning right on red look left, so people are safest approaching from the driver's left. In U.S. traffic that means using the right-hand side for your direction of travel; for cyclists it also means never riding against traffic. Distances in the route data are in meters, but always state them to the user in feet or miles (U.S. units), never meters. Be warm, concrete and brief. Plain text, no markdown headers. If the data is marked as sample data, mention that once at the end in a short clause.";
   const prompt = question
     ? `${sys}\n\nRoute data (JSON):\n${routeContext()}\n\nThe walker asks: ${question}\n\nAnswer in 2-5 sentences.`
     : `${sys}\n\nRoute data (JSON):\n${routeContext()}\n\nWrite a briefing of 4-6 sentences for this trip: which side to use and why, the crossings to be careful at, and any work zones or missing sidewalk at this departure time.`;

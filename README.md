@@ -52,6 +52,7 @@ Sightline plans walks and bike rides to work along a busy corridor. It tells the
 | `src/main.js` | Page logic: crossing diagram, step text, summary table, map/diagram tabs, Claude briefing | **Yes**, for UI and wording changes |
 | `src/map.js` | The real map (MapLibre GL + OpenFreeMap tiles); loaded only when needed | **Yes**, for map styling |
 | `src/mapdata.js` | Turns a route into map lines and pins (no map library, so it's testable) | Rarely |
+| `src/units.js` | Formats distances for display in feet and miles (the engine and data stay in meters) | Rarely |
 | `src/geo.js` | Converts between map coordinates and "meters along the corridor + side" | Rarely |
 | `src/engine.js` | Routing rules and scoring for walk and bike modes (the core logic) | **Yes**, to change safety rules or weights |
 | `src/data.js` | Corridor data: OSM data from `corridor-osm.js`, field-checked overrides (`FIELD_CHECKED`), and the illustrative events and places | **Yes**, to add field-checked rules, events, and places |
