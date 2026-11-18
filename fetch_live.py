@@ -183,7 +183,7 @@ def main():
     result = {
         "sample": False,
         "generatedAt": datetime.now().isoformat(timespec="minutes"),
-        "corridor": dict(CONFIG["corridor"], length=round(cor.length)),
+        "corridor": dict(CONFIG["corridor"], length=round(cor.length), line=[list(p) for p in CONFIG["line"]]),
         "intersections": CONFIG["intersections"],
         "sidewalks": fetch_sidewalks(cor),
         "events": fetch_events(cor),

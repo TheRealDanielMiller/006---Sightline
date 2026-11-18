@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sightline: get to work where drivers can see you</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3E%3Crect width='30' height='30' rx='8' fill='%2313263a'/%3E%3Cpath d='M5 15c3-5 7-7.5 10-7.5S22 10 25 15c-3 5-7 7.5-10 7.5S8 20 5 15z' fill='none' stroke='%23ffd96a' stroke-width='2'/%3E%3Ccircle cx='15' cy='15' r='3.4' fill='%23ffd96a'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -52,7 +53,18 @@
   .swap { height: 44px; width: 44px; border-radius: 10px; border: 1.5px solid var(--line); background: #fff; cursor: pointer; font-size: 18px; }
   #results { display: none; }
   #results.show { display: block; }
-  .res-grid { display: grid; grid-template-columns: 400px 1fr; gap: 24px; align-items: start; }
+  .res-grid { display: grid; grid-template-columns: 440px 1fr; gap: 24px; align-items: start; }
+  .viewtabs { display: flex; gap: 4px; margin: 0 0 10px; border: 1.5px solid var(--line); border-radius: 10px; padding: 3px; }
+  .viewtabs[hidden] { display: none; }
+  .viewtabs button { flex: 1; appearance: none; border: 0; background: transparent; border-radius: 7px; padding: 7px 10px; font: 700 14px "Public Sans", sans-serif; color: var(--ink2); cursor: pointer; }
+  .viewtabs button[aria-selected="true"] { background: var(--ink); color: #fff; }
+  #realMap { height: min(720px, calc(100vh - 150px)); min-height: 380px; border-radius: 12px; overflow: hidden; }
+  #realMap[hidden], #map[hidden] { display: none; }
+  .map-pin { display: grid; place-items: center; border-radius: 50%; border: 2px solid #fff; color: #fff; font: 800 12px "Public Sans", sans-serif; box-shadow: 0 1px 4px rgba(15, 23, 42, .35); cursor: pointer; padding: 0; }
+  .map-pin:focus-visible { outline: 3px solid var(--route); outline-offset: 2px; }
+  ol.steps li.locatable { cursor: pointer; border-radius: 10px; transition: background-color 160ms cubic-bezier(0.16, 1, 0.3, 1); }
+  ol.steps li.locatable:hover, ol.steps li.locatable:focus-visible { background: #f4f7fb; outline: none; }
+  ol.steps li.hl { background: #eaf1ff; }
   .mapcard { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 12px; position: sticky; top: 12px; }
   .mapcard svg { width: 100%; height: auto; display: block; }
   .legend { display: flex; flex-wrap: wrap; gap: 8px 14px; font-size: 12px; color: var(--ink2); padding: 8px 6px 2px; }
@@ -104,6 +116,7 @@
     form.od .swap { display: none; }
     .res-grid { grid-template-columns: 1fr; }
     .mapcard { position: static; }
+    #realMap { height: 420px; min-height: 0; }
   }
 </style>
 </head>
@@ -192,6 +205,11 @@
   <section id="results">
     <div class="res-grid">
       <div class="mapcard">
+        <div class="viewtabs" id="viewTabs" role="tablist" aria-label="Map view" hidden>
+          <button type="button" role="tab" data-view="real" aria-selected="true">Map</button>
+          <button type="button" role="tab" data-view="diagram" aria-selected="false">Crossing diagram</button>
+        </div>
+        <div id="realMap" hidden></div>
         <div id="map"></div>
         <div class="legend">
           <span><i style="background:var(--route);height:5px"></i>Your route</span>
@@ -219,8 +237,9 @@
 
   <footer>
     <div class="card">
-      <b>About the data.</b> <span id="dataNote">This demo runs on <b>sample data</b> that shows how the app behaves on US 41. Intersection layouts, sidewalk gaps and construction events are illustrative, not current conditions.</span>
+      <b>About the data.</b> <span id="dataNote">Road geometry, signal locations, sidewalks and bike lanes come from OpenStreetMap. Crosswalk layouts, No Turn on Red signs, signal timing, construction events and places are <b>illustrative</b>, not current conditions.</span>
       In production, sidewalks come from FDOT's Roadway Characteristics Inventory sidewalk layers (Feature 216) and construction from the FL511 events feed, refreshed on a schedule.
+      <div style="margin-top:8px;font-size:12.5px">Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>. Map tiles by <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a>.</div>
       <div class="filebox"><label for="fileIn" style="margin:0">Load a corridor file (from <code>fetch_live.py</code>):</label><input type="file" id="fileIn" accept=".json,application/json"><span class="err" id="fileErr"></span></div>
     </div>
     <p>Sightline is a prototype by Daniel Miller, PE. Always obey signals, posted detours and work-zone flaggers. Routing advice doesn't replace your own judgment.</p>

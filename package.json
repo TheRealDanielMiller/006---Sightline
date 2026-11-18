@@ -6,12 +6,17 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:artifact": "vite build --mode artifact",
     "preview": "vite preview",
     "test": "node --test \"test/**/*.test.js\"",
-    "demo": "node scripts/demo-routes.js"
+    "demo": "node scripts/demo-routes.js",
+    "fetch:osm": "node scripts/fetch-osm-corridor.mjs"
   },
   "devDependencies": {
     "vite": "^6.4.6",
     "vite-plugin-singlefile": "^2.3.4"
+  },
+  "dependencies": {
+    "maplibre-gl": "6.16.0"
   }
 }

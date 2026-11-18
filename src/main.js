@@ -70,9 +70,9 @@ function describe(r) {
         title = `Ride ${round10(a.len)} m ${d} on the ${WORD[a.side]} side${fac ? ` in the ${FAC_WORD[fac.type] || "bike lane"}` : ""}`;
       }
       // Walking a bike goes at walking speed.
-      steps.push({ badge: "", cls: "walk", title, why: `About ${minutesFor(a.len, bike && !a.againstM ? "bike" : "walk")} min.`, flags });
+      steps.push({ badge: "", cls: "walk", title, why: `About ${minutesFor(a.len, bike && !a.againstM ? "bike" : "walk")} min.`, flags, act: a });
     } else if (a.type === "pass") {
-      steps.push({ badge: "", cls: "walk", title: `Continue past ${a.I.name}`, why: `There's no street to cross on the ${WORD[a.side]} side. ${short(a.I)} only meets ${US()} from the other side.` });
+      steps.push({ badge: "", cls: "walk", title: `Continue past ${a.I.name}`, why: `There's no street to cross on the ${WORD[a.side]} side. ${short(a.I)} only meets ${US()} from the other side.`, act: a });
     } else if (a.type === "crossCross") {
       n++; a.n = n;
       const flags = [];
@@ -281,10 +281,64 @@ function renderSummary(r, t, ctx) {
 const round0 = (x) => Math.round(x);
 
 function renderSteps(steps) {
-  $("steps").innerHTML = steps.map((st) => `
-    <li><div class="badge ${st.cls}">${st.badge || (st.cls === "walk" ? "↓" : "")}</div>
+  $("steps").innerHTML = steps.map((st, i) => `
+    <li data-i="${i}"${st.act ? ' class="locatable" tabindex="0" title="Show on map"' : ""}><div class="badge ${st.cls}">${st.badge || (st.cls === "walk" ? "↓" : "")}</div>
       <div><div class="step-title">${esc(st.title)}</div>${st.why ? `<div class="why">${esc(st.why)}</div>` : ""}
       ${(st.flags || []).map((f) => `<div class="flag ${f.cls}">${esc(f.text)}</div>`).join("")}</div></li>`).join("");
+}
+
+// ---------- real map ----------
+// Loaded on demand. Not part of the Claude-artifact build (no outside tiles there):
+// Vite drops this whole branch when MODE is "artifact".
+const hasLine = (d) => !!(d.corridor && Array.isArray(d.corridor.line) && d.corridor.line.length >= 2);
+let routeMap = null, mapLoad = null, mapFailed = false;
+function setView(view) {
+  const real = view === "real" && routeMap && !mapFailed;
+  $("realMap").hidden = !real;
+  $("map").hidden = real;
+  for (const b of document.querySelectorAll("#viewTabs [data-view]")) b.setAttribute("aria-selected", String(b.dataset.view === (real ? "real" : "diagram")));
+  if (real) routeMap.resize();
+}
+function mapUnavailable(why) {
+  mapFailed = true; routeMap = null;
+  $("viewTabs").hidden = true;
+  setView("diagram");
+  if (why) console.warn("Real map unavailable, showing the diagram instead:", why);
+}
+function ensureMap() {
+  if (import.meta.env.MODE === "artifact") return Promise.resolve(null);
+  if (mapFailed || !hasLine(DATA)) { $("viewTabs").hidden = true; setView("diagram"); return Promise.resolve(null); }
+  if (!mapLoad) {
+    $("viewTabs").hidden = false;
+    $("realMap").hidden = false; $("map").hidden = true; // the map needs a visible, sized container
+    mapLoad = import("./map.js")
+      .then(({ createRouteMap }) => {
+        routeMap = createRouteMap($("realMap"), { data: DATA, onFail: mapUnavailable, onPinClick: highlightStep });
+        if (!mapFailed) setView("real");
+        return routeMap;
+      })
+      .catch((e) => { mapUnavailable(e.message); return null; });
+  }
+  return mapLoad;
+}
+function highlightStep(act) {
+  if (!last) return;
+  const i = last.steps.findIndex((s) => s.act === act);
+  const li = document.querySelector(`#steps li[data-i="${i}"]`);
+  if (!li) return;
+  for (const x of document.querySelectorAll("#steps li.hl")) x.classList.remove("hl");
+  li.classList.add("hl");
+  li.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+function locateStep(li) {
+  if (!last || !routeMap || mapFailed) return;
+  const st = last.steps[+li.dataset.i];
+  if (!st || !st.act) return;
+  setView("real");
+  routeMap.focus(st.act);
+  for (const x of document.querySelectorAll("#steps li.hl")) x.classList.remove("hl");
+  li.classList.add("hl");
+  if (window.innerWidth <= 920) document.querySelector(".mapcard").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function renderAlerts(r) {
@@ -317,12 +371,16 @@ function run() {
   $("results").classList.add("show");
   $("aiOut").style.display = "none"; $("aiOut").textContent = "";
   $("results").scrollIntoView({ behavior: "smooth", block: "start" });
+  ensureMap().then((m) => m && m.show(DATA, res.safe));
 }
 
 // ---------- events ----------
 $("startBtn").addEventListener("click", () => { $("plan").scrollIntoView({ behavior: "smooth" }); setTimeout(() => $("orig").focus(), 400); });
 $("swapBtn").addEventListener("click", () => { const a = $("orig").value; $("orig").value = $("dest").value; $("dest").value = a; });
 $("odForm").addEventListener("submit", (e) => { e.preventDefault(); run(); });
+$("steps").addEventListener("click", (e) => { const li = e.target.closest("li.locatable"); if (li) locateStep(li); });
+$("steps").addEventListener("keydown", (e) => { const li = e.target.closest("li.locatable"); if (li && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); locateStep(li); } });
+for (const b of document.querySelectorAll("#viewTabs [data-view]")) b.addEventListener("click", () => setView(b.dataset.view));
 for (const el of document.querySelectorAll('input[name="mode"]')) {
   el.addEventListener("change", () => {
     document.body.classList.toggle("bike", selectedMode() === "bike");
@@ -336,7 +394,7 @@ $("fileIn").addEventListener("change", async (e) => {
     const j = JSON.parse(await f.text());
     for (const k of ["corridor", "intersections", "sidewalks", "events", "places"]) if (!j[k]) throw new Error("missing '" + k + "'");
     DATA = j; fillPlaces(); $("results").classList.remove("show");
-    $("dataNote").innerHTML = "Using the corridor file you loaded (" + esc(f.name) + ").";
+    $("dataNote").innerHTML = "Using the corridor file you loaded (" + esc(f.name) + ")." + (hasLine(j) ? "" : " It has no road geometry (<code>corridor.line</code>), so only the diagram is shown.");
   } catch (err) { $("fileErr").textContent = "Couldn't read that file: " + err.message; }
 });
 

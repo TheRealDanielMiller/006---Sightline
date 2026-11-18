@@ -1,43 +1,53 @@
-// SAMPLE DATA — illustrative demo of US 41 near Six Mile Cypress Pkwy.
-// Positions are meters measured southward from the north end of the study corridor.
-// Replace with the output of fetch_live.py for real FDOT sidewalk + FL511 data.
+// Demo corridor: US 41 in south Fort Myers, from just south of College Pkwy to just
+// south of Jamaica Bay Blvd. Positions are meters south of the corridor's north end.
+//
+// Where each piece comes from:
+//  * Real (OpenStreetMap, via scripts/fetch-osm-corridor.mjs): the road's centerline, which
+//    signalized intersections exist and where, their side-street legs, sidewalk coverage,
+//    and bike lanes. OSM is community-mapped: spot-check it against aerials.
+//  * Illustrative (NOT verified): crosswalk legs, No Turn on Red, leading pedestrian
+//    intervals, heavy right turns, construction events, and the places list.
+import { OSM_CORRIDOR as OSM } from "./corridor-osm.js";
+
+// Per-intersection safety attributes. Illustrative until checked in the field.
+const CROSSING_RULES = {
+  sevenlakes: { crosswalks: { N: true, S: true, E: true, W: true }, ntor: [], lpi: false, heavyRight: [] },
+  cypresstrace: { crosswalks: { N: true, S: true, W: true }, ntor: [], lpi: false, heavyRight: [] },
+  daniels: { crosswalks: { N: true, S: true, E: true, W: true }, ntor: [], lpi: true, heavyRight: ["S"] },
+  cypressterrace: { crosswalks: { N: true, S: true, W: true }, ntor: [], lpi: false, heavyRight: [] },
+  lakeridge: { crosswalks: { N: true, S: true, E: true, W: true }, ntor: ["E"], lpi: false, heavyRight: [] },
+  sixmile: { crosswalks: { N: true, S: false, E: true, W: true }, ntor: [], lpi: false, heavyRight: ["N", "S"] },
+  jamaicabay: { crosswalks: { N: true, S: true, E: true }, ntor: [], lpi: false, heavyRight: [] },
+};
+
 export const SAMPLE_DATA = {
   sample: true,
-  corridor: { name: "US 41 (S. Tamiami Trail)", short: "US 41", city: "Fort Myers, FL", length: 2900, lanes: 6 },
-  intersections: [
-    { id: "daniels", name: "Daniels Pkwy", pos: 350, signal: true, legs: ["N", "S", "E"], crossLanes: 6,
-      crosswalks: { N: true, S: true, E: true }, ntor: [], lpi: false, heavyRight: ["S"] },
-    { id: "cypress", name: "Cypress Lake Dr", pos: 1100, signal: true, legs: ["N", "S", "E", "W"], crossLanes: 4,
-      crosswalks: { N: true, S: true, E: true, W: true }, ntor: ["E"], lpi: true, heavyRight: [] },
-    { id: "sixmile", name: "Six Mile Cypress Pkwy / Gladiolus Dr", short: "Six Mile Cypress", pos: 1900, signal: true, legs: ["N", "S", "E", "W"], crossLanes: 6,
-      crosswalks: { N: true, S: false, E: true, W: true }, ntor: [], lpi: false, heavyRight: ["N", "S"] },
-    { id: "island", name: "Island Park Rd", pos: 2600, signal: true, legs: ["N", "S", "E", "W"], crossLanes: 2,
-      crosswalks: { N: true, S: true, E: true, W: true }, ntor: [], lpi: false, heavyRight: [] },
-  ],
-  sidewalks: {
-    E: [ { from: 0, to: 1350, width: 5 }, { from: 1650, to: 2900, width: 6 } ],
-    W: [ { from: 0, to: 2050, width: 5 }, { from: 2250, to: 2900, width: 5 } ],
+  provenance: {
+    real: "Road geometry, signal locations, sidewalks and bike lanes from OpenStreetMap (" + OSM.fetchedAt + ").",
+    illustrative: "Crosswalk legs, No Turn on Red, leading pedestrian intervals, heavy right turns, construction events and places are illustrative.",
   },
-  // Bike facilities (illustrative). type: "lane" (painted), "protected" (separated on-road),
-  // "path" (off-street shared-use path). Anything not covered = no bike facility.
-  bikeFacilities: {
-    E: [ { from: 0, to: 1850, type: "lane" }, { from: 1950, to: 2900, type: "lane" } ],
-    W: [ { from: 0, to: 1000, type: "lane" }, { from: 2250, to: 2900, type: "path" } ],
+  corridor: {
+    name: "US 41 (S. Cleveland Ave / S. Tamiami Trail)", short: "US 41", city: "Fort Myers, FL",
+    length: OSM.length, lanes: 6, line: OSM.line,
   },
+  intersections: OSM.intersections.map((I) => ({ ...I, signal: true, ...CROSSING_RULES[I.id] })),
+  sidewalks: OSM.sidewalks,
+  // type: "lane" (painted), "protected" (separated on-road), "path" (off-street shared-use path).
+  bikeFacilities: OSM.bikeFacilities,
   events: [
-    { id: "FL511-S1", type: "Sidewalk closure", desc: "Utility work: west sidewalk closed", side: "W", from: 600, to: 900,
+    { id: "SAMPLE-1", type: "Sidewalk closure", desc: "Utility work: west sidewalk closed", side: "W", from: 1500, to: 1800,
       effect: "closed", schedule: { days: "weekdays", start: "07:00", end: "17:00" } },
-    { id: "FL511-S2", type: "Lane closure", desc: "Northbound right lane closed for drainage work; crews next to the east sidewalk", side: "E", from: 2250, to: 2500,
+    { id: "SAMPLE-2", type: "Lane closure", desc: "Northbound right lane closed for drainage work; crews next to the east sidewalk", side: "E", from: 3150, to: 3400,
       effect: "adjacent", schedule: { days: "all", start: "20:00", end: "05:00" } },
-    { id: "FL511-S3", type: "Intersection construction", desc: "Intersection improvement: east-side corners at Six Mile Cypress detoured", side: "E", from: 1860, to: 1940,
+    { id: "SAMPLE-3", type: "Intersection construction", desc: "Intersection improvement: east-side corners at Six Mile Cypress detoured", side: "E", from: 2925, to: 3000,
       effect: "closed", schedule: { days: "all", start: "00:00", end: "24:00" } },
   ],
   places: [
-    { id: "home", name: "Home (Villas neighborhood)", pos: 120, side: "W" },
-    { id: "bus", name: "LeeTran bus stop near Daniels Pkwy", pos: 450, side: "E" },
-    { id: "office", name: "Office park near Cypress Lake Dr", pos: 1250, side: "W" },
-    { id: "grocery", name: "Grocery store", pos: 1720, side: "E" },
-    { id: "plaza", name: "Retail plaza near Six Mile Cypress", pos: 2050, side: "E" },
-    { id: "work", name: "Island Park business center", pos: 2780, side: "W" },
+    { id: "home", name: "Home (west side, near Seven Lakes Blvd)", pos: 150, side: "W" },
+    { id: "bus", name: "Bus stop south of Daniels Pkwy", pos: 1000, side: "E" },
+    { id: "office", name: "Office park near Cypress Terrace", pos: 1550, side: "W" },
+    { id: "grocery", name: "Grocery store", pos: 2600, side: "E" },
+    { id: "plaza", name: "Retail plaza south of Six Mile Cypress", pos: 3100, side: "E" },
+    { id: "work", name: "Office near Jamaica Bay Blvd", pos: 3800, side: "W" },
   ],
 };

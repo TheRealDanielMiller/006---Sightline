@@ -2,8 +2,9 @@
 
 Sightline plans walks and bike rides to work along a busy corridor. It tells the commuter which side of the street to use and where to cross, steering around construction, missing sidewalks, wrong-way riding, and crossings where drivers turning right on red are looking the other way.
 
-- **Live demo (hosted on Claude):** https://claude.ai/artifact/2hRfy4aRJthRczTxsiRPYN. It's private until you share it from that page.
-- **Current state:** a working prototype on **sample data** for US 41 near Six Mile Cypress Pkwy, Fort Myers. Intersection layouts, sidewalk gaps, and construction events are illustrative, not real conditions.
+- **Live site (GitHub Pages, real map):** https://therealdanielmiller.github.io/006---Sightline/
+- **Claude-hosted demo (diagram only, with Ask Claude):** https://claude.ai/artifact/2hRfy4aRJthRczTxsiRPYN. It's private until you share it from that page.
+- **Current state:** a working prototype for US 41 in south Fort Myers, from College Pkwy to Jamaica Bay Blvd. The road geometry, signal locations, sidewalks, and bike lanes come from OpenStreetMap. Crosswalk layouts, No Turn on Red signs, signal timing, construction events, and places are illustrative, not real conditions.
 
 ---
 
@@ -26,11 +27,16 @@ Sightline plans walks and bike rides to work along a busy corridor. It tells the
    npm test
    ```
    To print the chosen route for six sample trips, with a "typical route" comparison for each: `npm run demo` (walk) or `npm run demo -- bike`.
-5. Build the publishable page:
+5. Build:
    ```
-   npm run build
+   npm run build            # the GitHub Pages site, with the real map, in dist/
+   npm run build:artifact   # one self-contained file for the Claude demo, in dist-artifact/index.html
    ```
-   This writes one self-contained file, `dist/index.html`, with all scripts and styles inlined.
+   You don't need to build for GitHub Pages yourself: pushing to `main` builds and publishes it (see section 6).
+6. Refresh the road geometry from OpenStreetMap (only when you change the corridor or want newer OSM data):
+   ```
+   npm run fetch:osm
+   ```
 
 **Shortcut:** `.vscode/tasks.json` has these commands. Press **Ctrl+Shift+P → "Tasks: Run Task"** and pick **Dev server**, **Build**, **Test routing**, **Print sample routes**, or **Fetch live data**.
 
@@ -43,13 +49,19 @@ Sightline plans walks and bike rides to work along a busy corridor. It tells the
 | File | Role | Edit it? |
 |---|---|---|
 | `index.html` | The page: layout, styles, the Walk/Bike toggle, the "Ask Claude" box | **Yes**, for layout and styling |
-| `src/main.js` | Page logic: map drawing, step text, summary table, Claude briefing | **Yes**, for UI and wording changes |
+| `src/main.js` | Page logic: crossing diagram, step text, summary table, map/diagram tabs, Claude briefing | **Yes**, for UI and wording changes |
+| `src/map.js` | The real map (MapLibre GL + OpenFreeMap tiles); loaded only when needed | **Yes**, for map styling |
+| `src/mapdata.js` | Turns a route into map lines and pins (no map library, so it's testable) | Rarely |
+| `src/geo.js` | Converts between map coordinates and "meters along the corridor + side" | Rarely |
 | `src/engine.js` | Routing rules and scoring for walk and bike modes (the core logic) | **Yes**, to change safety rules or weights |
-| `src/data.js` | Sample corridor data (intersections, sidewalks, bike facilities, events, places) | **Yes**, to fix the sample to match real conditions |
-| `test/engine.test.js` | Automated routing tests (`npm test`) | Add cases when you change rules |
+| `src/data.js` | Corridor data: real geometry from `corridor-osm.js` plus the illustrative crossing rules, events, and places | **Yes**, to fix crossing rules, events, and places |
+| `src/corridor-osm.js` | **Generated** by `npm run fetch:osm`: centerline, intersections, sidewalks, bike lanes | **No**. Edit the CONFIG in the script and re-run it |
+| `scripts/fetch-osm-corridor.mjs` | Builds `corridor-osm.js` from OpenStreetMap | Yes, the CONFIG block |
+| `test/*.test.js` | Automated tests for routing, geometry, and map data (`npm test`) | Add cases when you change rules |
 | `scripts/demo-routes.js` | Prints routes for sample trips (`npm run demo`) | Add trips as needed |
-| `vite.config.js` | Build settings (single-file output) | Rarely |
-| `dist/index.html` | **Generated.** The single file you publish | **No**. Run `npm run build` instead |
+| `vite.config.js` | Build settings for the Pages site and the single-file artifact | Rarely |
+| `.github/workflows/pages.yml` | Tests, builds, and publishes the site to GitHub Pages on every push to `main` | Rarely |
+| `dist/`, `dist-artifact/` | **Generated** build output (not committed) | **No** |
 | `fetch_live.py` | Pulls live FDOT sidewalk data and FL511 events into `corridor.json` | Yes, edit the CONFIG block |
 
 **Workflow:** run `npm run dev`, edit any file, and the browser reloads. Run `npm test` after changing `src/engine.js`.
@@ -109,7 +121,10 @@ The same format is used by `src/data.js` and by `corridor.json` from the live sc
 ```js
 {
   sample: true,
-  corridor: { name, short, city, length /* m */, lanes /* main road */ },
+  corridor: {
+    name, short, city, length /* m */, lanes /* main road */,
+    line: [[lat, lon], ...]   // optional centerline, north end first; enables the real map
+  },
   intersections: [{
     id, name, short?, pos, signal: true,
     legs: ["N","S","E","W"],            // omit "W" for a T-intersection on the east side
@@ -132,7 +147,9 @@ The same format is used by `src/data.js` and by `corridor.json` from the live sc
 }
 ```
 
-**First task:** correct `src/data.js` for the real US 41 corridor. Check the order of the cross streets, which intersections are T-intersections, missing crosswalks, No Turn on Red signs, leading pedestrian intervals, and where the bike lanes actually run (the sample `bikeFacilities` are made up). `fetch_live.py` doesn't fill in `bikeFacilities` yet, so a loaded corridor file without them treats the whole road as having no bike facility. You know this corridor, and anyone from FDOT District 1 who sees the demo will too.
+**Where the data comes from.** `npm run fetch:osm` pulls the US 41 centerline, the seven signalized intersections (with their side-street legs), sidewalk coverage, and bike lanes from OpenStreetMap into `src/corridor-osm.js`. OSM is community-mapped, so spot-check it against aerials. The intersection list itself is in the script's CONFIG.
+
+**First task:** in `src/data.js`, correct the illustrative crossing rules (`CROSSING_RULES`: missing crosswalks, No Turn on Red signs, leading pedestrian intervals, heavy right turns), then replace the sample events and places. You know this corridor, and anyone from FDOT District 1 who sees the demo will too. `fetch_live.py` doesn't fill in `bikeFacilities` yet, so a corridor file it writes treats the whole road as having no bike facility.
 
 ---
 
@@ -163,17 +180,17 @@ The same format is used by `src/data.js` and by `corridor.json` from the live sc
 
 ## 6. Hosting
 
-- **Claude artifact (current).** `dist/index.html` is published as a Claude artifact. Pages there can't load outside map tiles or call outside APIs, which is why the map is a hand-drawn diagram and the data is built in. The **Ask Claude** box only works there; it's hidden automatically anywhere else. To update the demo, run `npm run build` and ask Claude to republish `dist/index.html`.
-- **Your own hosting (GitHub Pages, Netlify).** Run `npm run build` and upload `dist/index.html` as-is. Everything works except Ask Claude. To keep that feature elsewhere, call the Claude API from a small backend. Never put an API key in the page.
+- **GitHub Pages (main site).** Every push to `main` runs `.github/workflows/pages.yml`, which runs the tests, builds, and publishes https://therealdanielmiller.github.io/006---Sightline/. One-time setup: on GitHub, **Settings → Pages → Build and deployment → Source: GitHub Actions**. The real map uses MapLibre GL with free OpenFreeMap tiles (no API key). If the tiles can't load, the page falls back to the crossing diagram. Everything works except Ask Claude; to offer that here, call the Claude API from a small backend. Never put an API key in the page.
+- **Claude artifact (demo).** Pages there can't load outside map tiles or call outside APIs, so `npm run build:artifact` leaves the map code out and the page shows the crossing diagram only. The **Ask Claude** box only works there; it's hidden automatically anywhere else. To update the demo, run `npm run build:artifact` and ask Claude to republish `dist-artifact/index.html`.
 
 ---
 
 ## 7. Suggested next steps
 
-1. **Correct the sample data** in `src/data.js` to match the real corridor (highest value, low effort).
+1. **Correct the illustrative crossing rules** in `src/data.js` (highest value, low effort).
 2. **Run live data once** and screenshot the result for your portfolio.
-3. **Real map.** On your own hosting, switch to Leaflet with OpenStreetMap tiles and draw the route on real geometry.
-4. **Real origin/destination entry.** Address search (geocoding) instead of the place list.
+3. **Live-data server.** A small Node server with Neon (Postgres) that merges FDOT construction, FL511, and community reports into the `events` format.
+4. **Real origin/destination entry.** Address search with an open-source geocoder (Photon or Pelias) instead of the place list.
 5. **Signal data.** Add pedestrian signal timing and leading-interval data from the county or FDOT signal inventory.
 6. **Crash validation.** Check the rules against Signal Four Analytics pedestrian crash data. A short write-up of that would be strong interview material.
 7. **Rider angle for Lime.** Bike mode is in place; scooters could reuse it with their own weights in `WEIGHTS` (and add where they park at the end of a trip).
@@ -186,4 +203,4 @@ The same format is used by `src/data.js` and by `corridor.json` from the live sc
 - **Insight:** comes from traffic engineering. Right-on-red drivers look left, so which side you walk on decides whether you're seen.
 - **Product decisions:** compare against a typical route so the benefit is measurable; take the departure time into account; give one plain-language reason at every crossing; send walkers to signals instead of mid-block crossings.
 - **AI usage:** built with Claude as a coding partner, plus a Claude-powered briefing and Q&A inside the app.
-- **Honest limits:** prototype; sample data; the scoring weights are judgment calls to validate against crash data.
+- **Honest limits:** prototype; real geometry from OpenStreetMap but illustrative crossing rules and events; the scoring weights are judgment calls to validate against crash data.

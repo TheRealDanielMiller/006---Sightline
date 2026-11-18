@@ -1,11 +1,68 @@
 {
   "version": "2.0.0",
   "tasks": [
-    { "label": "Dev server", "type": "shell", "command": "npm run dev", "isBackground": true, "problemMatcher": [] },
-    { "label": "Build", "type": "shell", "command": "npm run build", "group": { "kind": "build", "isDefault": true }, "problemMatcher": [] },
-    { "label": "Test routing", "type": "shell", "command": "npm test", "group": { "kind": "test", "isDefault": true }, "problemMatcher": [] },
-    { "label": "Print sample routes (walk)", "type": "shell", "command": "npm run demo", "problemMatcher": [] },
-    { "label": "Print sample routes (bike)", "type": "shell", "command": "npm run demo -- bike", "problemMatcher": [] },
-    { "label": "Fetch live data", "type": "shell", "command": "python fetch_live.py", "osx": { "command": "python3 fetch_live.py" }, "linux": { "command": "python3 fetch_live.py" }, "problemMatcher": [] }
+    {
+      "label": "Dev server",
+      "type": "shell",
+      "command": "npm run dev",
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "Build",
+      "type": "shell",
+      "command": "npm run build",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Build (Claude artifact)",
+      "type": "shell",
+      "command": "npm run build:artifact",
+      "problemMatcher": []
+    },
+    {
+      "label": "Test routing",
+      "type": "shell",
+      "command": "npm test",
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Print sample routes (walk)",
+      "type": "shell",
+      "command": "npm run demo",
+      "problemMatcher": []
+    },
+    {
+      "label": "Print sample routes (bike)",
+      "type": "shell",
+      "command": "npm run demo -- bike",
+      "problemMatcher": []
+    },
+    {
+      "label": "Fetch live data",
+      "type": "shell",
+      "command": "python fetch_live.py",
+      "osx": {
+        "command": "python3 fetch_live.py"
+      },
+      "linux": {
+        "command": "python3 fetch_live.py"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Refresh OSM corridor",
+      "type": "shell",
+      "command": "npm run fetch:osm",
+      "problemMatcher": []
+    }
   ]
 }
