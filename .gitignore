@@ -2,3 +2,5 @@ corridor.json
 __pycache__/
 *.png
 .DS_Store
+node_modules/
+dist/

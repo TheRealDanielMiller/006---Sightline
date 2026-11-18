@@ -1,7 +1,7 @@
 // SAMPLE DATA — illustrative demo of US 41 near Six Mile Cypress Pkwy.
 // Positions are meters measured southward from the north end of the study corridor.
 // Replace with the output of fetch_live.py for real FDOT sidewalk + FL511 data.
-const SAMPLE_DATA = {
+export const SAMPLE_DATA = {
   sample: true,
   corridor: { name: "US 41 (S. Tamiami Trail)", short: "US 41", city: "Fort Myers, FL", length: 2900, lanes: 6 },
   intersections: [
@@ -17,6 +17,12 @@ const SAMPLE_DATA = {
   sidewalks: {
     E: [ { from: 0, to: 1350, width: 5 }, { from: 1650, to: 2900, width: 6 } ],
     W: [ { from: 0, to: 2050, width: 5 }, { from: 2250, to: 2900, width: 5 } ],
+  },
+  // Bike facilities (illustrative). type: "lane" (painted), "protected" (separated on-road),
+  // "path" (off-street shared-use path). Anything not covered = no bike facility.
+  bikeFacilities: {
+    E: [ { from: 0, to: 1850, type: "lane" }, { from: 1950, to: 2900, type: "lane" } ],
+    W: [ { from: 0, to: 1000, type: "lane" }, { from: 2250, to: 2900, type: "path" } ],
   },
   events: [
     { id: "FL511-S1", type: "Sidewalk closure", desc: "Utility work: west sidewalk closed", side: "W", from: 600, to: 900,
@@ -35,4 +41,3 @@ const SAMPLE_DATA = {
     { id: "work", name: "Island Park business center", pos: 2780, side: "W" },
   ],
 };
-if (typeof module !== "undefined") module.exports = { SAMPLE_DATA };

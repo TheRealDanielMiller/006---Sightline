@@ -1,6 +1,6 @@
 # Sightline: Handoff
 
-Sightline plans walks to work along a busy corridor. It tells the walker which side of the street to use and where to cross, steering around construction, missing sidewalks, and crossings where drivers turning right on red are looking the other way.
+Sightline plans walks and bike rides to work along a busy corridor. It tells the commuter which side of the street to use and where to cross, steering around construction, missing sidewalks, wrong-way riding, and crossings where drivers turning right on red are looking the other way.
 
 - **Live demo (hosted on Claude):** https://claude.ai/artifact/2hRfy4aRJthRczTxsiRPYN. It's private until you share it from that page.
 - **Current state:** a working prototype on **sample data** for US 41 near Six Mile Cypress Pkwy, Fort Myers. Intersection layouts, sidewalk gaps, and construction events are illustrative, not real conditions.
@@ -9,31 +9,32 @@ Sightline plans walks to work along a busy corridor. It tells the walker which s
 
 ## 1. Set up in VS Code (about 10 minutes)
 
-**You need:** VS Code, Python 3.8+, and Node.js 18+ (Node is only needed for the routing tests).
+**You need:** VS Code, Node.js 18+, and Python 3.8+ (Python is only needed for `fetch_live.py`).
 
-1. Unzip `sightline.zip` somewhere convenient (e.g., `Documents/sightline`).
-2. In VS Code: **File → Open Folder…** and choose the `sightline` folder.
-3. Open a terminal (**Terminal → New Terminal**) and check the tools:
+1. Clone the repo and open the folder in VS Code (**File → Open Folder…**).
+2. Open a terminal (**Terminal → New Terminal**) and install the build tools:
    ```
-   python --version
-   node --version
+   npm install
    ```
-   On Mac/Linux, use `python3` if `python` isn't found.
-4. Build and run:
+3. Run the dev server (auto-reloads on save):
    ```
-   python build.py
-   python -m http.server 8000
+   npm run dev
    ```
-   Open http://localhost:8000 in your browser. Press **Ctrl+C** in the terminal to stop the server.
-5. Run the routing tests:
+   Open the URL it prints (usually http://localhost:5173). Press **Ctrl+C** to stop.
+4. Run the routing tests:
    ```
-   node test.js
+   npm test
    ```
-   This prints the chosen route for six sample trips, with a "typical route" comparison for each.
+   To print the chosen route for six sample trips, with a "typical route" comparison for each: `npm run demo` (walk) or `npm run demo -- bike`.
+5. Build the publishable page:
+   ```
+   npm run build
+   ```
+   This writes one self-contained file, `dist/index.html`, with all scripts and styles inlined.
 
-**Shortcut:** the `.vscode/tasks.json` file includes these commands. Press **Ctrl+Shift+P → "Tasks: Run Task"** and pick **Build**, **Serve**, **Test routing**, or **Fetch live data**.
+**Shortcut:** `.vscode/tasks.json` has these commands. Press **Ctrl+Shift+P → "Tasks: Run Task"** and pick **Dev server**, **Build**, **Test routing**, **Print sample routes**, or **Fetch live data**.
 
-**Recommended extensions:** Python (Microsoft), and optionally Live Server (Ritwick Dey) for auto-refresh when you open `index.html`.
+**Recommended extensions:** Python (Microsoft) for `fetch_live.py`.
 
 ---
 
@@ -41,19 +42,21 @@ Sightline plans walks to work along a busy corridor. It tells the walker which s
 
 | File | Role | Edit it? |
 |---|---|---|
-| `template.html` | The page: layout, styles, map drawing, step text, the "Ask Claude" box | **Yes**, for UI and wording changes |
-| `engine.js` | Routing rules and scoring (the core logic) | **Yes**, to change safety rules or weights |
-| `data.js` | Sample corridor data (intersections, sidewalks, events, places) | **Yes**, to fix the sample to match real conditions |
-| `build.py` | Combines template + data + engine into `index.html` | Rarely |
-| `index.html` | **Generated.** The single file you open or publish | **No**. Run `build.py` instead |
-| `test.js` | Prints routes for sample trips in the terminal | Add trips as needed |
+| `index.html` | The page: layout, styles, the Walk/Bike toggle, the "Ask Claude" box | **Yes**, for layout and styling |
+| `src/main.js` | Page logic: map drawing, step text, summary table, Claude briefing | **Yes**, for UI and wording changes |
+| `src/engine.js` | Routing rules and scoring for walk and bike modes (the core logic) | **Yes**, to change safety rules or weights |
+| `src/data.js` | Sample corridor data (intersections, sidewalks, bike facilities, events, places) | **Yes**, to fix the sample to match real conditions |
+| `test/engine.test.js` | Automated routing tests (`npm test`) | Add cases when you change rules |
+| `scripts/demo-routes.js` | Prints routes for sample trips (`npm run demo`) | Add trips as needed |
+| `vite.config.js` | Build settings (single-file output) | Rarely |
+| `dist/index.html` | **Generated.** The single file you publish | **No**. Run `npm run build` instead |
 | `fetch_live.py` | Pulls live FDOT sidewalk data and FL511 events into `corridor.json` | Yes, edit the CONFIG block |
 
-**Workflow:** edit `template.html`, `engine.js`, or `data.js`, run `python build.py`, then refresh the browser.
+**Workflow:** run `npm run dev`, edit any file, and the browser reloads. Run `npm test` after changing `src/engine.js`.
 
 ---
 
-## 3. How the routing works (engine.js)
+## 3. How the routing works (src/engine.js)
 
 The corridor is treated as one north–south line. Every feature has a **position** (meters south of the north end) and a **side** (`E` or `W`).
 
@@ -71,28 +74,37 @@ The code computes this geometrically (`visible = pedDir == rotateClockwise(-appr
 
 Switching sides only happens at signals. If the destination is across the road on the same block, the app sends the walker to the nearest signal instead of having them cross mid-block.
 
-**Scoring (equivalent meters, in `makeRouter`):**
+**Modes.** `plan(data, orig, dest, ctx, { mode })` takes `"walk"` (the default) or `"bike"`. Each mode has its own set of weights in `WEIGHTS` in `src/engine.js`. The visibility rule is the same for both.
 
-| Factor | Penalty |
-|---|---|
-| Walking distance | 1 per m |
-| No sidewalk | +5 per m (×1.5 after dark) |
-| Active sidewalk closure | +4 per m |
-| Active lane closure next to the sidewalk | +1 per m |
-| Crossing where right-on-red drivers look away | +250 (halved with a leading pedestrian interval; none with No Turn on Red) |
-| No marked crosswalk | +1,500 |
-| Heavy right turns on green coming from behind | +80 |
-| Corner work zone at a crossing | +400 |
+**Scoring (equivalent meters, `WEIGHTS`):**
+
+| Factor | Walk | Bike |
+|---|---|---|
+| Distance | 1 per m | 1 per m |
+| No sidewalk | +5 per m | +3 per m, only where there's also no bike lane or path |
+| (×1.5 after dark) | yes | yes |
+| Active sidewalk closure | +4 per m | +2 per m, none where the rider is in an on-road lane |
+| Active lane closure next to the curb | +1 per m | +3 per m (it usually takes the bike lane) |
+| Riding against traffic | – | +4 per m |
+| No bike lane or path | – | +2 per m (halved on roads under 4 lanes) |
+| Painted bike lane / shared-use path | – | +0.5 / +0.2 per m (protected lane: 0) |
+| Crossing where right-on-red drivers look away | +250 | +250 |
+| (halved with a leading pedestrian interval; none with No Turn on Red) | | |
+| No marked crosswalk | +1,500 | +600, none if the rider is in an on-road lane |
+| Heavy right turns on green from behind (right hook) | +80 | +400 |
+| Corner work zone at a crossing | +400 | +400 |
 
 These weights are judgment calls and the main thing to tune. The "typical route" for comparison uses the same engine with all penalties set to zero.
 
-**Time of day.** Construction events carry a schedule (days, start, end, overnight windows OK). Only events active at the departure time count. "Dark" is approximate for November in Fort Myers (before 6:50 am or after 5:40 pm). See `run()` in `template.html`.
+**Bike-mode rules in plain terms.** Ride with traffic: the with-traffic side is the same side the right-on-red rule prefers, so the two rules agree. Where a route must use the against-traffic side (for example, the first block from a door on the wrong side), the step text tells the rider to walk the bike on the sidewalk. Bike lanes make sidewalk gaps irrelevant, and a rider in an on-road lane goes through intersections with traffic instead of using the crosswalk. To change sides of the main road, riders walk the bike across in the crosswalk.
+
+**Time of day.** Construction events carry a schedule (days, start, end, overnight windows OK). Only events active at the departure time count. "Dark" is approximate for November in Fort Myers (before 6:50 am or after 5:40 pm). See `run()` in `src/main.js`.
 
 ---
 
 ## 4. Data format
 
-The same format is used by `data.js` and by `corridor.json` from the live script.
+The same format is used by `src/data.js` and by `corridor.json` from the live script.
 
 ```js
 {
@@ -108,6 +120,9 @@ The same format is used by `data.js` and by `corridor.json` from the live script
     heavyRight: ["S"]                    // main-road approaches with heavy right turns (S = northbound)
   }],
   sidewalks: { E: [{ from, to, width? }], W: [...] },   // gaps = anything not covered
+  bikeFacilities: {                                     // optional; anything not covered = no facility
+    E: [{ from, to, type: "lane" | "protected" | "path" }], W: [...]
+  },
   events: [{
     id, type, desc, side: "E" | "W" | "both", from, to,
     effect: "closed" | "adjacent",
@@ -117,7 +132,7 @@ The same format is used by `data.js` and by `corridor.json` from the live script
 }
 ```
 
-**First task:** correct `data.js` for the real US 41 corridor. Check the order of the cross streets, which intersections are T-intersections, missing crosswalks, No Turn on Red signs, and leading pedestrian intervals. You know this corridor, and anyone from FDOT District 1 who sees the demo will too.
+**First task:** correct `src/data.js` for the real US 41 corridor. Check the order of the cross streets, which intersections are T-intersections, missing crosswalks, No Turn on Red signs, leading pedestrian intervals, and where the bike lanes actually run (the sample `bikeFacilities` are made up). `fetch_live.py` doesn't fill in `bikeFacilities` yet, so a loaded corridor file without them treats the whole road as having no bike facility. You know this corridor, and anyone from FDOT District 1 who sees the demo will too.
 
 ---
 
@@ -126,7 +141,7 @@ The same format is used by `data.js` and by `corridor.json` from the live script
 1. Request an FL511 developer key at fl511.com (Developers page).
 2. Edit the `CONFIG` block:
    - `line`: the real corridor endpoints (lat, lon), north end first. Add points if the road bends.
-   - `intersections` and `places`: copy them from `data.js` once they're corrected.
+   - `intersections` and `places`: copy them from `src/data.js` once they're corrected.
    - `fl511_events`: confirm the events URL on the FL511 developer docs. The current URL follows the pattern other states' 511 sites use and hasn't been tested.
 3. Run it:
    ```
@@ -148,20 +163,20 @@ The same format is used by `data.js` and by `corridor.json` from the live script
 
 ## 6. Hosting
 
-- **Claude artifact (current).** `index.html` is published as a Claude artifact. Pages there can't load outside map tiles or call outside APIs, which is why the map is a hand-drawn diagram and the data is built in. The **Ask Claude** box only works there; it's hidden automatically anywhere else. To update the demo, ask Claude to republish the new `index.html`.
-- **Your own hosting (GitHub Pages, Netlify).** Upload `index.html` as-is. Everything works except Ask Claude. To keep that feature elsewhere, call the Claude API from a small backend. Never put an API key in the page.
+- **Claude artifact (current).** `dist/index.html` is published as a Claude artifact. Pages there can't load outside map tiles or call outside APIs, which is why the map is a hand-drawn diagram and the data is built in. The **Ask Claude** box only works there; it's hidden automatically anywhere else. To update the demo, run `npm run build` and ask Claude to republish `dist/index.html`.
+- **Your own hosting (GitHub Pages, Netlify).** Run `npm run build` and upload `dist/index.html` as-is. Everything works except Ask Claude. To keep that feature elsewhere, call the Claude API from a small backend. Never put an API key in the page.
 
 ---
 
 ## 7. Suggested next steps
 
-1. **Correct the sample data** in `data.js` to match the real corridor (highest value, low effort).
+1. **Correct the sample data** in `src/data.js` to match the real corridor (highest value, low effort).
 2. **Run live data once** and screenshot the result for your portfolio.
 3. **Real map.** On your own hosting, switch to Leaflet with OpenStreetMap tiles and draw the route on real geometry.
 4. **Real origin/destination entry.** Address search (geocoding) instead of the place list.
 5. **Signal data.** Add pedestrian signal timing and leading-interval data from the county or FDOT signal inventory.
 6. **Crash validation.** Check the rules against Signal Four Analytics pedestrian crash data. A short write-up of that would be strong interview material.
-7. **Rider angle for Lime.** The same side-of-street and crossing logic applies to scooter riders using sidewalks and shared-use paths, and to where they park at the end of a trip.
+7. **Rider angle for Lime.** Bike mode is in place; scooters could reuse it with their own weights in `WEIGHTS` (and add where they park at the end of a trip).
 
 ---
 
