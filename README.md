@@ -4,7 +4,7 @@ Sightline plans walks and bike rides to work along a busy corridor. It tells the
 
 - **Live site (GitHub Pages, real map):** https://therealdanielmiller.github.io/006---Sightline/
 - **Claude-hosted demo (diagram only, with Ask Claude):** https://claude.ai/artifact/2hRfy4aRJthRczTxsiRPYN. It's private until you share it from that page.
-- **Current state:** a working prototype for US 41 in south Fort Myers, from College Pkwy to Jamaica Bay Blvd. The road geometry, signal locations, sidewalks, and bike lanes come from OpenStreetMap. Crosswalk layouts, No Turn on Red signs, signal timing, construction events, and places are illustrative, not real conditions.
+- **Current state:** a working prototype for US 41 in south Fort Myers, from College Pkwy to Jamaica Bay Blvd. The road geometry, signal locations, crosswalks, free right-turn slip lanes, sidewalks, and bike lanes come from OpenStreetMap. No Turn on Red signs and leading pedestrian intervals aren't verified yet, so none are assumed. Construction events and places are illustrative, not real conditions.
 
 ---
 
@@ -54,7 +54,7 @@ Sightline plans walks and bike rides to work along a busy corridor. It tells the
 | `src/mapdata.js` | Turns a route into map lines and pins (no map library, so it's testable) | Rarely |
 | `src/geo.js` | Converts between map coordinates and "meters along the corridor + side" | Rarely |
 | `src/engine.js` | Routing rules and scoring for walk and bike modes (the core logic) | **Yes**, to change safety rules or weights |
-| `src/data.js` | Corridor data: real geometry from `corridor-osm.js` plus the illustrative crossing rules, events, and places | **Yes**, to fix crossing rules, events, and places |
+| `src/data.js` | Corridor data: OSM data from `corridor-osm.js`, field-checked overrides (`FIELD_CHECKED`), and the illustrative events and places | **Yes**, to add field-checked rules, events, and places |
 | `src/corridor-osm.js` | **Generated** by `npm run fetch:osm`: centerline, intersections, sidewalks, bike lanes | **No**. Edit the CONFIG in the script and re-run it |
 | `scripts/fetch-osm-corridor.mjs` | Builds `corridor-osm.js` from OpenStreetMap | Yes, the CONFIG block |
 | `test/*.test.js` | Automated tests for routing, geometry, and map data (`npm test`) | Add cases when you change rules |
@@ -147,9 +147,11 @@ The same format is used by `src/data.js` and by `corridor.json` from the live sc
 }
 ```
 
-**Where the data comes from.** `npm run fetch:osm` pulls the US 41 centerline, the seven signalized intersections (with their side-street legs), sidewalk coverage, and bike lanes from OpenStreetMap into `src/corridor-osm.js`. OSM is community-mapped, so spot-check it against aerials. The intersection list itself is in the script's CONFIG.
+**Where the data comes from.** `npm run fetch:osm` pulls the US 41 centerline, the seven signalized intersections (with their side-street legs, crosswalks, and slip lanes), sidewalk coverage, and bike lanes from OpenStreetMap into `src/corridor-osm.js`. OSM is community-mapped, so spot-check it against aerials. The intersection list itself is in the script's CONFIG.
 
-**First task:** in `src/data.js`, correct the illustrative crossing rules (`CROSSING_RULES`: missing crosswalks, No Turn on Red signs, leading pedestrian intervals, heavy right turns), then replace the sample events and places. You know this corridor, and anyone from FDOT District 1 who sees the demo will too. `fetch_live.py` doesn't fill in `bikeFacilities` yet, so a corridor file it writes treats the whole road as having no bike facility.
+**Crossings.** The fetch script also reads OSM crossings: a leg has a crosswalk when OSM maps a marked crossing on it, and a corner has a slip lane when OSM maps an unsignalized crossing out on that corner (currently NE, SE, and SW at Daniels / Cypress Lake). Heavy right turns are inferred from slip lanes. Every leg on this stretch has a mapped crosswalk.
+
+**First task:** in `src/data.js`, fill in `FIELD_CHECKED` from a field visit or FDOT: No Turn on Red signs, leading pedestrian intervals, heavy right turns without slip lanes, and any crosswalk OSM gets wrong. Then replace the sample events and places. You know this corridor, and anyone from FDOT District 1 who sees the demo will too. `fetch_live.py` doesn't fill in `bikeFacilities` yet, so a corridor file it writes treats the whole road as having no bike facility.
 
 ---
 
@@ -187,7 +189,7 @@ The same format is used by `src/data.js` and by `corridor.json` from the live sc
 
 ## 7. Suggested next steps
 
-1. **Correct the illustrative crossing rules** in `src/data.js` (highest value, low effort).
+1. **Field-check No Turn on Red and leading pedestrian intervals** and add them to `FIELD_CHECKED` in `src/data.js` (highest value, low effort).
 2. **Run live data once** and screenshot the result for your portfolio.
 3. **Live-data server.** A small Node server with Neon (Postgres) that merges FDOT construction, FL511, and community reports into the `events` format.
 4. **Real origin/destination entry.** Address search with an open-source geocoder (Photon or Pelias) instead of the place list.
@@ -203,4 +205,4 @@ The same format is used by `src/data.js` and by `corridor.json` from the live sc
 - **Insight:** comes from traffic engineering. Right-on-red drivers look left, so which side you walk on decides whether you're seen.
 - **Product decisions:** compare against a typical route so the benefit is measurable; take the departure time into account; give one plain-language reason at every crossing; send walkers to signals instead of mid-block crossings.
 - **AI usage:** built with Claude as a coding partner, plus a Claude-powered briefing and Q&A inside the app.
-- **Honest limits:** prototype; real geometry from OpenStreetMap but illustrative crossing rules and events; the scoring weights are judgment calls to validate against crash data.
+- **Honest limits:** prototype; real geometry and crosswalks from OpenStreetMap, but No Turn on Red and leading intervals unverified and events illustrative; the scoring weights are judgment calls to validate against crash data.

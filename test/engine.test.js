@@ -134,3 +134,23 @@ test("sample data: every sample trip routes in both modes", () => {
     }
   }
 });
+
+test("slip-lane corners add a penalty to crosswalks that start or end there", () => {
+  const from = place(900, "E"), to = place(100, "E");
+  const plain = plan(corridor({ intersections: [X("mid", 500)] }), from, to, CTX);
+  const slipped = plan(corridor({ intersections: [X("mid", 500, { slipCorners: ["NE", "SE", "SW"] })] }), from, to, CTX);
+  const a = crossings(plain.safe)[0], b = crossings(slipped.safe)[0];
+  assert.equal(a.side, "E");
+  assert.deepEqual(b.slip, ["NE", "SE"]);
+  assert.equal(b.cost - a.cost, 2 * WEIGHTS.walk.slip);
+  // The typical route ignores safety penalties.
+  assert.equal(crossings(slipped.typical)[0].cost, crossings(plain.typical)[0].cost);
+});
+
+test("corridor data: OSM crosswalks on every leg, Daniels slip lanes imply heavy northbound rights", () => {
+  for (const I of SAMPLE_DATA.intersections) for (const l of I.legs) assert.equal(I.crosswalks[l], true, `${I.id} ${l}`);
+  const d = SAMPLE_DATA.intersections.find((I) => I.id === "daniels");
+  assert.deepEqual(d.slipCorners, ["NE", "SE", "SW"]);
+  assert.deepEqual(d.heavyRight, ["S"]);
+  assert.ok(SAMPLE_DATA.intersections.every((I) => I.ntor.length === 0 && I.lpi === false), "unverified: none assumed");
+});

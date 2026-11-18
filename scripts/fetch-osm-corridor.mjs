@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 // Builds src/corridor-osm.js from OpenStreetMap: the corridor centerline, where each
-// signalized intersection sits along it, and sidewalk / bike-lane coverage on each side.
+// signalized intersection sits along it, which of its legs have a marked crosswalk, which
+// corners have a free right-turn slip lane, and sidewalk / bike-lane coverage on each side.
 //
 // Usage: npm run fetch:osm
 //
-// Intersections are listed by hand below (from OSM traffic-signal nodes). Their
-// safety attributes (crosswalk legs, No Turn on Red, leading intervals, heavy right
-// turns) are NOT in OSM reliably; those stay in src/data.js until field-verified.
+// Intersections are listed by hand below (from OSM traffic-signal nodes). No Turn on Red
+// signs and leading pedestrian intervals are NOT in OSM here; those stay in src/data.js
+// until field-verified.
 //
 // OSM data © OpenStreetMap contributors, ODbL 1.0.
 import { writeFileSync } from "node:fs";
@@ -59,6 +60,35 @@ function merge(ranges, gap) {
 }
 
 const round = (x) => Math.round(x);
+
+// Crosswalks and slip lanes at one intersection, from OSM crossing nodes and
+// footway=crossing ways near it. Positions are relative to the intersection center:
+// dpos > 0 is south, x > 0 is east of the centerline.
+//  * N/S leg crosswalk: a crossing on the US 41 carriageways 5-50 m north/south of center.
+//  * E/W leg crosswalk: a crossing on the side street 15-45 m east/west, within 20 m along.
+//  * Slip-lane corner: an explicitly unsignalized crossing (crossing:signals=no) out on a
+//    corner diagonal; at a signalized intersection that's a free right-turn lane.
+function crossingsAt(frame, els, pos, legs) {
+  const found = new Set(), slip = new Set();
+  for (const e of els) {
+    const t = e.tags || {};
+    const isX = (e.type === "node" && t.highway === "crossing") || (e.type === "way" && t.footway === "crossing");
+    if (!isX || t.crossing === "unmarked" || t.crossing === "no" || t["crossing:markings"] === "no") continue;
+    const pts = (e.type === "node" ? [e] : e.geometry).map((g) => frame.project(g.lat, g.lon));
+    const dpos = pts.reduce((a, p) => a + p.pos, 0) / pts.length - pos;
+    const xs = pts.map((p) => (p.side === "E" ? p.dist : -p.dist));
+    const x0 = Math.min(...xs), x1 = Math.max(...xs), xm = (x0 + x1) / 2;
+    if (Math.abs(dpos) > 50 || Math.min(Math.abs(x0), Math.abs(x1)) > 45) continue;
+    const ns = dpos < 0 ? "N" : "S", ew = xm > 0 ? "E" : "W";
+    if (t["crossing:signals"] === "no" && Math.abs(dpos) > 15 && Math.abs(xm) > 15) slip.add(ns + ew);
+    else if (Math.abs(dpos) >= 5 && (x0 < -5 && x1 > 5 || Math.abs(xm) < 15)) found.add(ns);
+    else if (Math.abs(dpos) <= 20 && Math.abs(xm) >= 15) found.add(ew);
+  }
+  return {
+    crosswalks: Object.fromEntries(legs.map((l) => [l, found.has(l)])),
+    slipCorners: [...slip].sort(),
+  };
+}
 const toRanges = (r) => merge(r, CONFIG.mergeGapM).map(([from, to]) => ({ from: round(from), to: round(to) })).filter((s) => s.to - s.from >= 10);
 
 async function main() {
@@ -68,6 +98,7 @@ async function main() {
     way["highway"~"^(primary|trunk)$"]["ref"~"${CONFIG.ref}"]${bb};
     way["highway"="footway"]${bb};
     way["highway"~"^(cycleway|path)$"]${bb};
+    node["highway"="crossing"]${bb};
   );out tags geom;`);
   const carriage = els.filter((x) => /^(primary|trunk)$/.test(x.tags.highway));
   console.log(`OSM ways: ${els.length} (${carriage.length} ${CONFIG.ref} carriageway pieces)`);
@@ -106,7 +137,7 @@ async function main() {
   const intersections = CONFIG.intersections.map(({ lat, lon, ...I }) => {
     const p = frame.project(lat, lon);
     if (p.dist > 40) console.warn(`  ${I.name} is ${round(p.dist)} m off the centerline; check its coordinates`);
-    return { ...I, pos: round(p.pos) };
+    return { ...I, pos: round(p.pos), ...crossingsAt(frame, els, p.pos, I.legs) };
   });
 
   // Sidewalks and paths: pieces of footways/paths running alongside the corridor.
@@ -156,7 +187,10 @@ async function main() {
     const cov = (rs) => round(rs.reduce((t, r) => t + r.to - r.from, 0) / frame.length * 100);
     console.log(`Side ${side}: sidewalk ${cov(sidewalks[side])}% (${sidewalks[side].length} pieces), bike facility ${cov(bikeFacilities[side])}%`);
   }
-  for (const I of intersections) console.log(`  ${String(I.pos).padStart(5)} m  ${I.name}`);
+  for (const I of intersections) {
+    const missing = I.legs.filter((l) => !I.crosswalks[l]);
+    console.log(`  ${String(I.pos).padStart(5)} m  ${I.name}  crosswalks: ${missing.length ? "missing " + missing.join(",") : "all legs"}${I.slipCorners.length ? "  slip lanes: " + I.slipCorners.join(",") : ""}`);
+  }
 
   const out = {
     source: "OpenStreetMap (© OpenStreetMap contributors, ODbL)",

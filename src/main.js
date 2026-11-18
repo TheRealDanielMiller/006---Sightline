@@ -87,24 +87,33 @@ function describe(r) {
       }
       if (a.rightHook === "toward") flags.push({ cls: "go", text: `Right-turning drivers from ${US()} will be coming toward you, so you can see each other.` });
       if (a.corner && a.corner.length) flags.push({ cls: "warn", text: `Corner work zone: ${a.corner[0].desc}. Follow the posted detour.` });
+      if (a.slip && a.slip.length) { cls = cls === "stop" ? cls : "warn"; flags.push(slipFlag(a)); }
       const title = a.inRoad ? `Ride through ${a.I.name} in the bike lane on the ${WORD[a.side]} side` : `Cross ${a.I.name} on the ${WORD[a.side]} side of ${US()}`;
       steps.push({ badge: String(n), cls, title, why: crossingWhy(a, r), flags, act: a });
     } else if (a.type === "crossCorridor") {
       n++; a.n = n;
       const flags = [];
-      const cls = a.blind ? "warn" : "go";
+      const cls = a.blind || (a.slip && a.slip.length) ? "warn" : "go";
       const approachDir = a.leg === "N" ? "southbound" : "northbound";
       const otherLeg = a.leg === "N" ? "S" : "N";
       if (a.ntor) flags.push({ cls: "go", text: `"No Turn on Red" is posted for ${approachDir} ${US()} drivers here.` });
       else if (a.visible) flags.push({ cls: "go", text: `${cap(approachDir)} drivers turning right on red look left for traffic, which is toward you on this crosswalk.` });
       else flags.push({ cls: "warn", text: `${cap(approachDir)} drivers turning right on red look away from you on this crosswalk.${a.I.crosswalks[otherLeg] ? "" : ` The ${WORD[otherLeg]} crosswalk, where they'd see you, is missing here.`} Wait for a full stop and eye contact.` });
       if (a.corner && a.corner.length) flags.push({ cls: "warn", text: `Corner work zone: ${a.corner[0].desc}. Follow the posted detour.` });
+      if (a.slip && a.slip.length) flags.push(slipFlag(a));
       if (bike) flags.push({ cls: "go", text: `Walk your bike across in the crosswalk, or use a two-stage turn box if one is marked.` });
       steps.push({ badge: String(n), cls, title: `Cross ${US()} to the ${WORD[a.to]} side on the ${WORD[a.leg]} crosswalk at ${a.I.name}`, why: corridorWhy(a, r), flags, act: a });
     }
   }
   steps.push({ badge: "B", cls: "end", title: `Arrive at ${r.dest.name}`, why: `On the ${WORD[r.dest.side]} side.` });
   return steps;
+}
+
+const CORNER_WORD = { NE: "northeast", NW: "northwest", SE: "southeast", SW: "southwest" };
+function slipFlag(a) {
+  const where = a.slip.map((c) => CORNER_WORD[c]).join(" and ");
+  const many = a.slip.length > 1;
+  return { cls: "warn", text: `Free right-turn lane${many ? "s" : ""} at the ${where} corner${many ? "s" : ""}: the short crossing${many ? "s" : ""} over ${many ? "them have" : "it has"} no signal, and drivers there are looking left for a gap, not at you. Wait until they stop.` };
 }
 
 function crossingWhy(a, r) {

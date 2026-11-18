@@ -275,11 +275,11 @@ export const OSM_CORRIDOR = {
   ],
   [
    26.539425,
-   -81.871368
+   -81.871369
   ],
   [
    26.5392,
-   -81.871363
+   -81.871364
   ],
   [
    26.538975,
@@ -642,7 +642,14 @@ export const OSM_CORRIDOR = {
     "W"
    ],
    "crossLanes": 2,
-   "pos": 289
+   "pos": 289,
+   "crosswalks": {
+    "N": true,
+    "S": true,
+    "E": true,
+    "W": true
+   },
+   "slipCorners": []
   },
   {
    "id": "cypresstrace",
@@ -653,7 +660,13 @@ export const OSM_CORRIDOR = {
     "W"
    ],
    "crossLanes": 2,
-   "pos": 488
+   "pos": 488,
+   "crosswalks": {
+    "N": true,
+    "S": true,
+    "W": true
+   },
+   "slipCorners": []
   },
   {
    "id": "daniels",
@@ -666,7 +679,18 @@ export const OSM_CORRIDOR = {
     "W"
    ],
    "crossLanes": 6,
-   "pos": 913
+   "pos": 913,
+   "crosswalks": {
+    "N": true,
+    "S": true,
+    "E": true,
+    "W": true
+   },
+   "slipCorners": [
+    "NE",
+    "SE",
+    "SW"
+   ]
   },
   {
    "id": "cypressterrace",
@@ -677,7 +701,13 @@ export const OSM_CORRIDOR = {
     "W"
    ],
    "crossLanes": 2,
-   "pos": 1380
+   "pos": 1380,
+   "crosswalks": {
+    "N": true,
+    "S": true,
+    "W": true
+   },
+   "slipCorners": []
   },
   {
    "id": "lakeridge",
@@ -690,7 +720,14 @@ export const OSM_CORRIDOR = {
     "W"
    ],
    "crossLanes": 2,
-   "pos": 2239
+   "pos": 2239,
+   "crosswalks": {
+    "N": true,
+    "S": true,
+    "E": true,
+    "W": true
+   },
+   "slipCorners": []
   },
   {
    "id": "sixmile",
@@ -703,7 +740,14 @@ export const OSM_CORRIDOR = {
     "W"
    ],
    "crossLanes": 6,
-   "pos": 2963
+   "pos": 2963,
+   "crosswalks": {
+    "N": true,
+    "S": true,
+    "E": true,
+    "W": true
+   },
+   "slipCorners": []
   },
   {
    "id": "jamaicabay",
@@ -714,7 +758,13 @@ export const OSM_CORRIDOR = {
     "E"
    ],
    "crossLanes": 2,
-   "pos": 3634
+   "pos": 3634,
+   "crosswalks": {
+    "N": true,
+    "S": true,
+    "E": true
+   },
+   "slipCorners": []
   }
  ],
  "sidewalks": {

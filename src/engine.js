@@ -6,6 +6,8 @@
 //    (the right-hand side, moving with the adjacent traffic).
 //  * Crossing the corridor itself: east->west on the north leg, west->east on the south leg.
 //  * Avoid sidewalk gaps, active construction, missing crosswalks.
+//  * Free right-turn slip lanes put an unsignalized crossing at that corner (drivers yield
+//    while looking left for a gap), so every crosswalk that starts or ends there costs extra.
 // Bike mode adds:
 //  * Riding against traffic (wrong-way sidewalk or lane riding) is penalized per meter.
 //  * Road stress by facility: none > painted lane > shared-use path > protected lane.
@@ -17,12 +19,12 @@ export const SPEED_M_PER_MIN = { walk: 80, bike: 250 };
 
 const ZERO = {
   gapPerM: 0, closedPerM: 0, adjacentPerM: 0, againstPerM: 0, noFacilityPerM: 0, lanePerM: 0, pathPerM: 0,
-  blind: 0, noXwalk: 0, behind: 0, toward: 0, corner: 0, darkGap: 1,
+  blind: 0, noXwalk: 0, behind: 0, toward: 0, corner: 0, slip: 0, darkGap: 1,
 };
 
 // Penalties in equivalent meters. These are judgment calls: validate against crash data.
 export const WEIGHTS = {
-  walk: { ...ZERO, gapPerM: 5, closedPerM: 4, adjacentPerM: 1, blind: 250, noXwalk: 1500, behind: 80, toward: 20, corner: 400, darkGap: 1.5 },
+  walk: { ...ZERO, gapPerM: 5, closedPerM: 4, adjacentPerM: 1, blind: 250, noXwalk: 1500, behind: 80, toward: 20, corner: 400, slip: 150, darkGap: 1.5 },
   bike: {
     ...ZERO,
     gapPerM: 3,          // no sidewalk AND no bike facility: in mixed traffic or on the shoulder
@@ -32,7 +34,7 @@ export const WEIGHTS = {
     noFacilityPerM: 2,   // no bike lane or path (scaled down on roads under 4 lanes)
     lanePerM: 0.5,       // painted lane next to fast traffic (same scaling)
     pathPerM: 0.2,       // shared-use path: pedestrian and driveway conflicts
-    blind: 250, noXwalk: 600, behind: 400, toward: 40, corner: 400, darkGap: 1.5,
+    blind: 250, noXwalk: 600, behind: 400, toward: 40, corner: 400, slip: 150, darkGap: 1.5,
   },
 };
 
@@ -182,8 +184,15 @@ export function makeRouter(data, opts) {
     }
     act.corner = cornerEvents(I, [side]);
     if (act.corner.length) cost += P.corner;
+    if (!act.inRoad) cost += slipCost(act, I, ["N" + side, "S" + side]);
     act.cost = cost;
     return act;
+  }
+
+  // Slip-lane corners this crosswalk starts or ends at, e.g. "NE".
+  function slipCost(act, I, corners) {
+    act.slip = corners.filter((c) => (I.slipCorners || []).includes(c));
+    return act.slip.length * P.slip;
   }
 
   // Cross the corridor at intersection I on leg (N or S), from side `from` to the other side.
@@ -199,6 +208,7 @@ export function makeRouter(data, opts) {
     if (act.blind) cost += P.blind * (I.lpi ? 0.5 : 1);
     act.corner = cornerEvents(I, ["E", "W"]);
     if (act.corner.length) cost += P.corner;
+    cost += slipCost(act, I, [leg + "E", leg + "W"]);
     act.cost = cost;
     return act;
   }
