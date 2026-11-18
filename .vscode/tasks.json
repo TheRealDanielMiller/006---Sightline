@@ -1,0 +1,9 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    { "label": "Build", "type": "shell", "command": "python build.py", "windows": { "command": "python build.py" }, "osx": { "command": "python3 build.py" }, "linux": { "command": "python3 build.py" }, "group": { "kind": "build", "isDefault": true }, "problemMatcher": [] },
+    { "label": "Serve", "type": "shell", "command": "python -m http.server 8000", "osx": { "command": "python3 -m http.server 8000" }, "linux": { "command": "python3 -m http.server 8000" }, "dependsOn": "Build", "isBackground": true, "problemMatcher": [] },
+    { "label": "Test routing", "type": "shell", "command": "node test.js", "group": "test", "problemMatcher": [] },
+    { "label": "Fetch live data", "type": "shell", "command": "python fetch_live.py", "osx": { "command": "python3 fetch_live.py" }, "linux": { "command": "python3 fetch_live.py" }, "problemMatcher": [] }
+  ]
+}
