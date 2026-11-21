@@ -5,6 +5,10 @@
 //
 // Usage: npm run fetch:osm -- us41     (or sr80; no argument fetches every corridor)
 //
+// A corridor is an FDOT roadway id and a milepost range. FDOT's line gives the extent,
+// direction and mileposts; OSM gives the precise centerline and everything on the street.
+// FDOT's sidewalk inventory is saved alongside OSM's sidewalks for comparison.
+//
 // A corridor is one road between two points. "Start" is position 0; positions grow toward
 // the far end. Sides "E"/"W" are left/right of travel from the start (east/west for a road
 // run north to south) and legs "N"/"S" point back toward the start / on toward the end.
@@ -33,10 +37,9 @@ const DEFAULTS = {
 const CORRIDORS = {
   us41: {
     ref: "US 41",
-    axis: "lat", // sample the centerline along latitude (a north-south road)
-    start: 26.6416, // just north of McGregor Blvd / Dr. Martin Luther King Jr. Blvd (SR 82)
-    end: 26.5195, // just south of Jamaica Bay Blvd
-    bbox: [26.515, -81.885, 26.646, -81.860], // south, west, north, east
+    roadway: "12010000", // FDOT roadway id
+    from: 23.643, // start: just north of McGregor Blvd / Dr. Martin Luther King Jr. Blvd (SR 82)
+    to: 15.19, // end: just south of Jamaica Bay Blvd
     overrides: [
   { match: /Martin Luther King/, id: "mlk", name: "McGregor Blvd / Dr. Martin Luther King Jr. Blvd (SR 82)", short: "McGregor / MLK" },
   { near: [26.5969, -81.8718], id: "colonial", name: "Colonial Blvd (interchange ramps)", short: "Colonial Blvd" },
@@ -52,10 +55,9 @@ const CORRIDORS = {
   sr80: {
     ref: "SR 80",
     name: /Palm Beach/, // SR 80 also runs on Seaboard St and the downtown one-way pair
-    axis: "lon", // sample along longitude (a west-east road)
-    start: -81.8540, // just west of Seaboard St
-    end: -81.7945, // just east of Ortiz Ave
-    bbox: [26.645, -81.858, 26.692, -81.790],
+    roadway: "12020000",
+    from: 1.528, // start: just west of Seaboard St
+    to: 5.855, // end: just past Orange River Blvd, east of I-75
     overrides: [
       { match: /Riverside/, id: "riverside" },
       { match: /Shoemaker/, id: "shoemaker", name: "Veronica S. Shoemaker Blvd", short: "Shoemaker Blvd" },
@@ -101,6 +103,68 @@ async function overpass(query) {
     } catch (e) { lastErr = e; console.warn("Overpass failed, trying next:", e.message); }
   }
   throw lastErr;
+}
+
+// ---------- FDOT (Florida Dept. of Transportation open data, Transportation Data & Analytics) ----------
+// Roads are identified by an 8-digit ROADWAY id and located by milepost (MP) along it.
+const FDOT = "https://services1.arcgis.com/O1JpcwDW8sjYuddV/ArcGIS/rest/services";
+const STATION_M = 25; // spacing of centerline points
+const M_PER_MI = 1609.344;
+
+async function fdotQuery(service, where, extra = "") {
+  const url = `${FDOT}/${service}/FeatureServer/0/query?where=${encodeURIComponent(where)}&outFields=*&f=json${extra}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`${service}: HTTP ${res.status}`);
+  const j = await res.json();
+  if (j.error) throw new Error(`${service}: ${j.error.message}`);
+  return j.features;
+}
+
+// Local flat coordinates in meters (x east, y north) around a latitude; fine for a few miles.
+function localXY(lat0) {
+  const kx = 111320 * Math.cos((lat0 * Math.PI) / 180), ky = 110574;
+  return {
+    toXY: (p) => [(p.lon ?? p[1]) * kx, (p.lat ?? p[0]) * ky],
+    toLL: ([x, y]) => [y / ky, x / kx],
+  };
+}
+
+// FDOT's centerline for `roadway` from milepost `from` to `to` (either order: the corridor
+// starts at `from`), as stations every STATION_M meters carrying their milepost.
+async function fdotStations(roadway, from, to) {
+  const [f] = await fdotQuery("LRS_Routes_with_Measures_TDA", `ROADWAY='${roadway}'`, "&returnM=true&outSR=4326");
+  if (!f) throw new Error(`FDOT has no roadway ${roadway}`);
+  // Paths are [lon, lat, milepost]; join multi-part lines in milepost order.
+  const pts = f.geometry.paths.flat().map(([lon, lat, m]) => ({ lat, lon, m })).sort((a, b) => a.m - b.m);
+  const lo = Math.min(from, to), hi = Math.max(from, to);
+  if (lo < pts[0].m - 0.01 || hi > pts.at(-1).m + 0.01) throw new Error(`MP ${from}-${to} is outside roadway ${roadway} (MP ${pts[0].m.toFixed(2)}-${pts.at(-1).m.toFixed(2)})`);
+  const at = (m) => {
+    let i = 0;
+    while (i < pts.length - 2 && pts[i + 1].m < m) i++;
+    const a = pts[i], b = pts[i + 1], t = b.m === a.m ? 0 : (m - a.m) / (b.m - a.m);
+    return { lat: a.lat + t * (b.lat - a.lat), lon: a.lon + t * (b.lon - a.lon), m };
+  };
+  const n = Math.max(1, Math.round(((hi - lo) * M_PER_MI) / STATION_M));
+  const out = [];
+  for (let k = 0; k <= n; k++) out.push(at(from + ((to - from) * k) / n));
+  return out;
+}
+
+// FDOT sidewalk inventory for the corridor, as position ranges per side. RDWYSIDE is relative
+// to FDOT's inventory direction (increasing milepost): R = right, L = left, C = both, G = none.
+async function fdotSidewalks(roadway, posOfMp, increasing) {
+  const feats = await fdotQuery("Sidewalks_and_Gaps_TDA", `ROADWAY='${roadway}'`, "&returnGeometry=false");
+  // Our "E" side is the left of travel from the corridor start.
+  const sideOf = { L: increasing ? ["E"] : ["W"], R: increasing ? ["W"] : ["E"], C: ["E", "W"], G: [] };
+  const out = { E: [], W: [], inventoried: [] };
+  for (const { attributes: a } of feats) {
+    const p0 = posOfMp(a.BEGIN_POST), p1 = posOfMp(a.END_POST);
+    if (p0 == null || p1 == null) continue;
+    const r = [Math.min(p0, p1), Math.max(p0, p1)];
+    out.inventoried.push(r);
+    for (const s of sideOf[a.RDWYSIDE] || []) out[s].push(r);
+  }
+  return out;
 }
 
 function merge(ranges, gap) {
@@ -248,8 +312,13 @@ async function main() {
 }
 
 async function fetchCorridor(corridorId) {
-  const [s, w, n, e] = CONFIG.bbox;
-  const bb = `(${s},${w},${n},${e})`;
+  // FDOT's line for this roadway between the two mileposts: the corridor's extent, direction,
+  // and milepost reference. Stations every ~25 m, start end first.
+  const stations = await fdotStations(CONFIG.roadway, CONFIG.from, CONFIG.to);
+  const lats = stations.map((p) => p.lat), lons = stations.map((p) => p.lon);
+  const PAD = 0.004; // ~400 m around the road
+  const [s, w, n, e] = [Math.min(...lats) - PAD, Math.min(...lons) - PAD, Math.max(...lats) + PAD, Math.max(...lons) + PAD];
+  const bb = `(${s.toFixed(5)},${w.toFixed(5)},${n.toFixed(5)},${e.toFixed(5)})`;
   const els = await overpass(`[out:json][timeout:120];
     way["highway"~"^(primary|trunk)$"]["ref"~"${CONFIG.ref}"]${bb}->.main;
     node(w.main)->.mainNodes;
@@ -266,46 +335,67 @@ async function fetchCorridor(corridorId) {
   const carriage = els.filter(isMain);
   console.log(`OSM ways: ${els.length} (${carriage.length} ${CONFIG.ref} carriageway pieces)`);
 
-  // Centerline: step along the axis (~25 m apart) from start to end; at each step find where
-  // each carriageway crosses it and average the two directions. A two-way (undivided) piece
-  // counts for both. Assumes the road keeps moving along the axis (no doubling back).
-  const A = CONFIG.axis, B = A === "lat" ? "lon" : "lat";
-  const dirSign = Math.sign(CONFIG.end - CONFIG.start); // +1 if the axis value grows toward the end
+  // Centerline: FDOT's line follows one side of a divided road, a few meters off the middle,
+  // and our side-of-road rules work in meters from the middle. So at each FDOT station, look
+  // across the road (perpendicular to FDOT's line) for the OSM carriageways in each direction
+  // and take the midpoint. A two-way (undivided) piece counts for both directions. Works on
+  // curving roads; FDOT's line is only the guide.
+  const { toXY, toLL } = localXY(stations[0].lat);
   const segs = { N: [], S: [] }; // N: carriageways heading back toward the start; S: toward the end
+  const tangentAt = (i) => {
+    const a = toXY(stations[Math.max(0, i - 2)]), b = toXY(stations[Math.min(stations.length - 1, i + 2)]);
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    return [(b[0] - a[0]) / L, (b[1] - a[1]) / L];
+  };
+  const guide = makeFrame(stations.map((p) => [p.lat, p.lon]));
   for (const way of carriage) {
-    const g = way.geometry;
+    const g = way.geometry.map(toXY);
     const twoWay = way.tags.oneway !== "yes" && way.tags.oneway !== "-1";
-    const toEnd = Math.sign(g[g.length - 1][A] - g[0][A]) === dirSign;
+    const sign = way.tags.oneway === "-1" ? -1 : 1;
     for (let i = 0; i < g.length - 1; i++) {
+      // Direction of this piece compared with the corridor's direction at the same spot.
+      const mid = toLL([(g[i][0] + g[i + 1][0]) / 2, (g[i][1] + g[i + 1][1]) / 2]);
+      const near = guide.project(mid[0], mid[1]);
+      if (near.dist > 60) continue;
+      const k = Math.min(stations.length - 1, Math.round(near.pos / STATION_M));
+      const t = tangentAt(k);
+      const toEnd = sign * ((g[i + 1][0] - g[i][0]) * t[0] + (g[i + 1][1] - g[i][1]) * t[1]) > 0;
       if (twoWay || toEnd) segs.S.push([g[i], g[i + 1]]);
       if (twoWay || !toEnd) segs.N.push([g[i], g[i + 1]]);
     }
   }
-  const crossAt = (dir, v) => {
-    const xs = [];
+  // Signed distance along the normal from station p to the nearest carriageway piece crossing it.
+  const crossAt = (dir, p, nrm) => {
+    let best = null;
     for (const [a, b] of segs[dir]) {
-      if ((a[A] - v) * (b[A] - v) > 0 || a[A] === b[A]) continue;
-      xs.push(a[B] + ((v - a[A]) / (b[A] - a[A])) * (b[B] - a[B]));
+      const d = [b[0] - a[0], b[1] - a[1]];
+      const den = nrm[0] * d[1] - nrm[1] * d[0];
+      if (Math.abs(den) < 1e-9) continue;
+      const ap = [a[0] - p[0], a[1] - p[1]];
+      const u = (ap[0] * d[1] - ap[1] * d[0]) / den; // along the normal
+      const v = (ap[0] * nrm[1] - ap[1] * nrm[0]) / den; // along the piece, 0..1
+      if (v < 0 || v > 1 || Math.abs(u) > 40) continue;
+      if (best === null || Math.abs(u) < Math.abs(best)) best = u;
     }
-    xs.sort((x, y) => x - y);
-    return xs.length ? xs[Math.floor(xs.length / 2)] : null;
+    return best;
   };
-  const STEP = A === "lat" ? 0.000225 : 0.00025;
-  let line = [], lastGap = null;
-  const steps = Math.floor(Math.abs(CONFIG.end - CONFIG.start) / STEP + 1e-6);
-  for (let k = 0; k <= steps; k++) {
-    const v = CONFIG.start + dirSign * k * STEP;
-    const nb = crossAt("N", v), sb = crossAt("S", v);
-    let w;
-    if (nb != null && sb != null) { w = (nb + sb) / 2; lastGap = nb - sb; }
-    else if (nb != null && lastGap != null) w = nb - lastGap / 2;
-    else if (sb != null && lastGap != null) w = sb + lastGap / 2;
-    else continue;
-    const pt = A === "lat" ? [v, w] : [w, v];
-    line.push([+pt[0].toFixed(6), +pt[1].toFixed(6)]);
-  }
+  let line = [], mp = [], lastGap = null, lastU = 0, fdotOnly = 0;
+  stations.forEach((st, i) => {
+    const p = toXY(st), t = tangentAt(i), nrm = [-t[1], t[0]];
+    const un = crossAt("N", p, nrm), us = crossAt("S", p, nrm);
+    let u;
+    if (un != null && us != null) { u = (un + us) / 2; lastGap = un - us; }
+    else if (un != null && lastGap != null) u = un - lastGap / 2;
+    else if (us != null && lastGap != null) u = us + lastGap / 2;
+    else { u = lastU; fdotOnly++; }
+    lastU = u;
+    const [lat, lon] = toLL([p[0] + u * nrm[0], p[1] + u * nrm[1]]);
+    line.push([+lat.toFixed(6), +lon.toFixed(6)]);
+    mp.push(+st.m.toFixed(3));
+  });
   const frame = makeFrame(line);
-  console.log(`Centerline: ${line.length} points, ${round(frame.length)} m`);
+  console.log(`Centerline: ${line.length} points, ${round(frame.length)} m, MP ${CONFIG.from} -> ${CONFIG.to}` +
+    (fdotOnly ? ` (${fdotOnly} stations with no OSM carriageway found; used FDOT's line)` : ""));
 
   const intersections = findIntersections(frame, els, carriage).map((I) => ({ ...I, ...crossingsAt(frame, els, I.pos, I.legs) }));
 
@@ -381,16 +471,53 @@ async function fetchCorridor(corridorId) {
   const LEFT_OF = { south: "east", north: "west", east: "north", west: "south" };
   const compass = { S: travel, N: OPPOSITE[travel], E: LEFT_OF[travel], W: OPPOSITE[LEFT_OF[travel]] };
 
+  // FDOT sidewalk inventory, in corridor positions, and where it disagrees with OSM.
+  const mpPos = mp.map((m, i) => [m, frame.project(line[i][0], line[i][1]).pos]);
+  const increasing = CONFIG.to > CONFIG.from;
+  const posOfMp = (m) => {
+    const lo = Math.min(CONFIG.from, CONFIG.to), hi = Math.max(CONFIG.from, CONFIG.to);
+    const c = Math.max(lo, Math.min(hi, m));
+    if (m < lo - 1e-6 && c === lo && Math.abs(m - lo) > 0.001 && m < lo) { /* clipped */ }
+    let i = 0;
+    while (i < mpPos.length - 2 && (increasing ? mpPos[i + 1][0] < c : mpPos[i + 1][0] > c)) i++;
+    const [m0, p0] = mpPos[i], [m1, p1] = mpPos[i + 1];
+    return m1 === m0 ? p0 : p0 + ((c - m0) / (m1 - m0)) * (p1 - p0);
+  };
+  const fdot = await fdotSidewalks(CONFIG.roadway, posOfMp, increasing);
+  const fdotSidewalksOut = { E: toRanges(fdot.E), W: toRanges(fdot.W), inventoried: toRanges(fdot.inventoried) };
+  const disagreements = [];
+  for (const side of ["E", "W"]) {
+    const has = (rs, p) => rs.some((r) => p >= r.from && p <= r.to);
+    let cur = null;
+    for (let p = 0; p <= frame.length; p += 10) {
+      const inv = has(fdotSidewalksOut.inventoried, p);
+      const o = has(sidewalks[side], p), fd = has(fdotSidewalksOut[side], p);
+      const kind = !inv ? null : o && !fd ? "osm-only" : fd && !o ? "fdot-only" : null;
+      if (kind && cur && cur.kind === kind && p - cur.to <= 10) cur.to = p;
+      else if (kind) { cur = { side, kind, from: p, to: p }; disagreements.push(cur); }
+    }
+  }
+  const sidewalkConflicts = disagreements.filter((d) => d.to - d.from >= 50)
+    .map((d) => ({ ...d, mpFrom: +mpNear(d.from).toFixed(2), mpTo: +mpNear(d.to).toFixed(2) }));
+  function mpNear(p) { let best = mpPos[0]; for (const x of mpPos) if (Math.abs(x[1] - p) < Math.abs(best[1] - p)) best = x; return best[0]; }
+  const cov = (rs) => round(rs.reduce((t, r) => t + r.to - r.from, 0) / frame.length * 100);
+  console.log(`FDOT sidewalk inventory: E ${cov(fdotSidewalksOut.E)}%, W ${cov(fdotSidewalksOut.W)}% (inventoried ${cov(fdotSidewalksOut.inventoried)}% of the corridor)`);
+  for (const d of sidewalkConflicts) console.log(`  sidewalk conflict, ${d.side} side ${d.from}-${d.to} m (MP ${d.mpFrom}-${d.mpTo}): ${d.kind === "osm-only" ? "OSM has one, FDOT says none" : "FDOT has one, OSM has none"}`);
+
   const out = {
     id: corridorId,
+    roadway: CONFIG.roadway,
     compass,
     source: "OpenStreetMap (© OpenStreetMap contributors, ODbL)",
     fetchedAt: new Date().toISOString().slice(0, 10),
     length: round(frame.length),
     line,
+    mp, // FDOT milepost at each line point
     intersections,
     sidewalks,
     bikeFacilities,
+    fdotSidewalks: fdotSidewalksOut,
+    sidewalkConflicts,
   };
   writeFileSync(new URL(`../src/corridors/${corridorId}-osm.js`, import.meta.url),
     `// GENERATED by scripts/fetch-osm-corridor.mjs. Do not edit; re-run the script instead.\n` +

@@ -145,6 +145,18 @@ test("corridors say what their relative codes mean on the ground", () => {
   assert.ok(e[1] > w[1] && e[0] > w[0], "SR 80 heads east-northeast from the start");
 });
 
+test("corridors are anchored to FDOT roadway mileposts", async () => {
+  const { OSM_CORRIDOR: us41 } = await import("../src/corridors/us41-osm.js");
+  const { OSM_CORRIDOR: sr80 } = await import("../src/corridors/sr80-osm.js");
+  for (const [c, roadway, dir] of [[us41, "12010000", -1], [sr80, "12020000", 1]]) {
+    assert.equal(c.roadway, roadway);
+    assert.equal(c.mp.length, c.line.length, "a milepost for every centerline point");
+    for (let i = 1; i < c.mp.length; i++) assert.ok(Math.sign(c.mp[i] - c.mp[i - 1]) === dir, `${roadway} mileposts run one way`);
+  }
+  // FDOT's inventory and OSM disagree at the I-75 interchange on Palm Beach Blvd; that gets listed.
+  assert.ok(sr80.sidewalkConflicts.some((d) => d.kind === "osm-only" && d.mpFrom >= 5.3 && d.mpTo <= 5.9));
+});
+
 test("Palm Beach Blvd: I-75 ramp signals are crossings, places sit in order", () => {
   const ids = SR80_DATA.intersections.map((I) => I.id);
   for (const id of ["shoemaker", "marsh", "newyork", "ortiz", "i75west", "i75east"]) assert.ok(ids.includes(id), id);
