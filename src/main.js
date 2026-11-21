@@ -1,8 +1,9 @@
 import { plan, gapsFor, facilityAt, SPEED_M_PER_MIN } from "./engine.js";
-import { CORRIDORS } from "./data.js";
+import { CATALOG, DEFAULT_CORRIDOR, loadCorridor } from "./data.js";
 import { fmtDist, fmtFeet, fmtMiles } from "./units.js";
 
-let DATA = CORRIDORS[0];
+// The corridor in use. Set once the default corridor loads (see the end of this file).
+let DATA = { corridor: { compass: {} }, places: [], intersections: [], sidewalks: {}, events: [] };
 const $ = (id) => document.getElementById(id);
 // Compass words for the relative codes. Sides E/W are left/right of travel from the corridor's
 // start; legs N/S point back toward the start / on toward the end. On US 41 (run north to
@@ -17,7 +18,6 @@ function setCompass(d) {
     CORNER_WORD[leg + side] = [WORD[leg], WORD[side]].sort((a, b) => NS_FIRST[a] - NS_FIRST[b]).join("");
   }
 }
-setCompass(DATA);
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const short = (I) => I.short || I.name;
@@ -35,17 +35,30 @@ const selectedMode = () => (document.querySelector('input[name="mode"]:checked')
 const FAC_WORD = { lane: "bike lane", protected: "protected bike lane", path: "shared-use path" };
 const minutesFor = (meters, mode) => Math.max(1, Math.round(meters / SPEED_M_PER_MIN[mode]));
 
+// Corridors listed worst first: people killed or seriously injured walking or biking, 2011-2022.
+const RANKED = [...CATALOG].sort((a, b) => b.crashes.ksi - a.crashes.ksi || b.crashes.n - a.crashes.n);
 function fillCorridors() {
   const sel = $("corridorPick");
   if (!sel) return;
-  sel.innerHTML = CORRIDORS.map((c, i) => `<option value="${i}">${esc(c.corridor.name)}</option>`).join("");
-  sel.value = String(Math.max(0, CORRIDORS.indexOf(DATA)));
-  sel.closest("[hidden]")?.removeAttribute("hidden");
+  sel.innerHTML = RANKED.map((c) => {
+    const k = c.crashes;
+    return `<option value="${esc(c.id)}">${esc(c.name)} · ${(c.length / 1609.344).toFixed(1)} mi · ${k.ksi} killed or seriously injured, ${k.n} crashes</option>`;
+  }).join("");
+  sel.value = DATA.id || DEFAULT_CORRIDOR;
 }
 function useCorridor(d) {
   DATA = d; setCompass(d); fillPlaces();
+  if ($("corridorPick")) $("corridorPick").value = d.id || "";
   $("results").classList.remove("show");
   last = null;
+}
+async function pickCorridor(id) {
+  $("formErr").textContent = "";
+  const sel = $("corridorPick");
+  if (sel) sel.disabled = true;
+  try { useCorridor(await loadCorridor(id)); }
+  catch (e) { $("formErr").textContent = "Couldn't load that corridor: " + e.message; }
+  finally { if (sel) sel.disabled = false; }
 }
 
 function fillPlaces() {
@@ -416,6 +429,7 @@ function renderAlerts(r) {
 
 function run() {
   $("formErr").textContent = "";
+  if (!DATA.places.length) { $("formErr").textContent = "The corridor is still loading."; return; }
   const P = Object.fromEntries(DATA.places.map((p) => [p.id, p]));
   const o = P[$("orig").value], d = P[$("dest").value];
   if (!o || !d || o.id === d.id) { $("formErr").textContent = "Pick two different places."; return; }
@@ -440,7 +454,7 @@ function run() {
 }
 
 // ---------- events ----------
-$("corridorPick") && $("corridorPick").addEventListener("change", (e) => useCorridor(CORRIDORS[+e.target.value]));
+$("corridorPick") && $("corridorPick").addEventListener("change", (e) => pickCorridor(e.target.value));
 $("startBtn").addEventListener("click", () => { $("plan").scrollIntoView({ behavior: "smooth" }); setTimeout(() => $("orig").focus(), 400); });
 $("swapBtn").addEventListener("click", () => { const a = $("orig").value; $("orig").value = $("dest").value; $("dest").value = a; });
 $("odForm").addEventListener("submit", (e) => { e.preventDefault(); run(); });
@@ -509,4 +523,4 @@ $("aiQ").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.prevent
 })();
 
 fillCorridors();
-fillPlaces();
+pickCorridor(DEFAULT_CORRIDOR);

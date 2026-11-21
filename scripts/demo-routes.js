@@ -1,6 +1,8 @@
 // Prints the chosen and typical routes for sample trips. Usage: npm run demo [-- bike]
 import { plan } from "../src/engine.js";
-import { SAMPLE_DATA as D } from "../src/data.js";
+import { loadCorridor } from "../src/data.js";
+
+const D = await loadCorridor("us41");
 
 const mode = process.argv[2] || "walk";
 const P = Object.fromEntries(D.places.map((p) => [p.id, p]));

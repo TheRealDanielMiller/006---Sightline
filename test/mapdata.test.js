@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import { buildMapData, hasGeometry, OFFSET } from "../src/mapdata.js";
 import { makeFrame } from "../src/geo.js";
 import { plan } from "../src/engine.js";
-import { SAMPLE_DATA as D } from "../src/data.js";
+import { loadCorridor } from "../src/data.js";
+
+const D = await loadCorridor("us41");
 
 const CTX = { minutes: 7 * 60 + 30, weekend: false, dark: false };
 const P = Object.fromEntries(D.places.map((p) => [p.id, p]));

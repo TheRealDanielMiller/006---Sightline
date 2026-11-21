@@ -22,7 +22,7 @@
 // pedestrian intervals are NOT in OSM here; those stay in src/data.js until field-verified.
 //
 // OSM data © OpenStreetMap contributors, ODbL 1.0.
-import { writeFileSync } from "node:fs";
+import { writeFileSync, readFileSync, existsSync } from "node:fs";
 import { makeFrame } from "../src/geo.js";
 
 const DEFAULTS = {
@@ -34,8 +34,12 @@ const DEFAULTS = {
 
 // Overrides give detected intersections stable ids and labels, matched by name (or, where OSM
 // gives no usable name, by being within 60 m of `near` [lat, lon]).
+// Each corridor: display names (title, short, city, lanes), the FDOT roadway and milepost
+// range (from = the start end, which should be the north or west end), the OSM route number(s)
+// that tag its carriageways, an optional OSM name filter, and intersection overrides.
 const CORRIDORS = {
   us41: {
+    title: "US 41 (Cleveland Ave / S. Tamiami Trail)", short: "US 41", city: "Fort Myers, FL", lanes: 6,
     ref: "US 41",
     roadway: "12010000", // FDOT roadway id
     from: 23.643, // start: just north of McGregor Blvd / Dr. Martin Luther King Jr. Blvd (SR 82)
@@ -53,6 +57,7 @@ const CORRIDORS = {
     ],
   },
   sr80: {
+    title: "SR 80 (Palm Beach Blvd)", short: "Palm Beach Blvd", city: "Fort Myers, FL", lanes: 4,
     ref: "SR 80",
     name: /Palm Beach/, // SR 80 also runs on Seaboard St and the downtown one-way pair
     roadway: "12020000",
@@ -70,6 +75,48 @@ const CORRIDORS = {
       { match: /Orange River/, id: "orangeriver", name: "Orange River Blvd / Louise St", short: "Orange River Blvd" },
     ],
   },
+  sr82: {
+    title: "SR 82 (Dr. Martin Luther King Jr. Blvd)", short: "MLK Blvd", city: "Fort Myers, FL", lanes: 4,
+    ref: "SR 82", roadway: "12070000",
+    from: 0, // start: Cleveland Ave (US 41)
+    to: 3.05, // end: east of Veronica S. Shoemaker Blvd
+    overrides: [],
+  },
+  sr78: {
+    title: "SR 78 (Pine Island Rd / Bayshore Rd)", short: "SR 78", city: "North Fort Myers, FL", lanes: 4,
+    ref: "SR 78", roadway: "12060000",
+    from: 14.6, // start: Pine Island Rd west of US 41
+    to: 17.3, // end: Bayshore Rd east of US 41
+    overrides: [],
+  },
+  us41bonita: {
+    title: "US 41 (S. Tamiami Trail), Bonita Springs", short: "US 41", city: "Bonita Springs, FL", lanes: 6,
+    ref: "US 41", roadway: "12010000",
+    from: 1.6, // start: north end
+    to: 0.02, // end: just north of the Collier County line
+    overrides: [],
+  },
+  sanCarlos: {
+    title: "SR 865 (San Carlos Blvd)", short: "San Carlos Blvd", city: "Fort Myers Beach, FL", lanes: 4,
+    ref: "SR 865", roadway: "12004000",
+    from: 4.5, // start: north of Summerlin Rd
+    to: 0.02, // end: Fort Myers Beach, at Estero Blvd
+    overrides: [],
+  },
+  colonial: {
+    title: "SR 884 (Colonial Blvd)", short: "Colonial Blvd", city: "Fort Myers, FL", lanes: 6,
+    ref: ["SR 884", "CR 884"], roadway: "12005000",
+    from: 4.3, // start: west of Winkler Ave
+    to: 5.8, // end: east of Six Mile Cypress Pkwy
+    overrides: [],
+  },
+  bus41: {
+    title: "US 41 Business (N. Tamiami Trail)", short: "Business 41", city: "North Fort Myers, FL", lanes: 4,
+    ref: "US 41 Business", roadway: "12001000",
+    from: 2.9, // start: north end
+    to: 1.3, // end: south end, toward the river
+    overrides: [],
+  },
 };
 const CORRIDOR_ID = process.argv[2];
 let CONFIG, OVERRIDES;
@@ -82,7 +129,7 @@ const isSideRoad = (t) => /^(primary|secondary|tertiary|unclassified|residential
 const RANK = { primary: 6, secondary: 5, tertiary: 4, unclassified: 3, residential: 2, living_street: 1, service: 0 };
 // Shorter labels: "North Airport Road" -> "N Airport Rd". A direction word is abbreviated only
 // when a name follows it, so "South Street" stays "South St".
-const ABBR = { Street: "St", Avenue: "Ave", Boulevard: "Blvd", Drive: "Dr", Road: "Rd", Parkway: "Pkwy", Court: "Ct", Lane: "Ln", Terrace: "Ter" };
+const ABBR = { Northeast: "NE", Northwest: "NW", Southeast: "SE", Southwest: "SW", Street: "St", Avenue: "Ave", Boulevard: "Blvd", Drive: "Dr", Road: "Rd", Parkway: "Pkwy", Court: "Ct", Lane: "Ln", Terrace: "Ter" };
 const abbreviate = (s) => s
   .replace(/\b(North|South|East|West) (?=\S+ \S)/g, (w) => w[0] + " ")
   .replace(/\b[A-Z][a-z]+\b/g, (w) => ABBR[w] || w);
@@ -306,12 +353,44 @@ async function main() {
   for (const id of ids) {
     if (!CORRIDORS[id]) throw new Error(`unknown corridor "${id}"; known: ${Object.keys(CORRIDORS).join(", ")}`);
     CONFIG = { ...DEFAULTS, ...CORRIDORS[id] }; OVERRIDES = CONFIG.overrides;
-    console.log(`\n== ${id} (${CONFIG.ref}) ==`);
+    console.log(`\n== ${id} (${[].concat(CONFIG.ref).join(", ")}) ==`);
     await fetchCorridor(id);
   }
+  writeCatalog();
+}
+
+// src/corridors/index.js: what the app needs to list corridors without loading them: names,
+// FDOT location, length, and crash totals from data/lee-crash-bins.json. Plus a loader per
+// corridor (a dynamic import, so the site fetches a corridor only when it's picked).
+function writeCatalog() {
+  const binsFile = new URL("../data/lee-crash-bins.json", import.meta.url);
+  const bins = existsSync(binsFile) ? JSON.parse(readFileSync(binsFile, "utf8")).roadways : {};
+  const entries = [];
+  for (const [id, c] of Object.entries(CORRIDORS)) {
+    const file = new URL(`../src/corridors/${id}-osm.js`, import.meta.url);
+    if (!existsSync(file)) continue;
+    const text = readFileSync(file, "utf8");
+    const length = +(/"length":\s*(\d+)/.exec(text) || [])[1];
+    const lo = Math.min(c.from, c.to), hi = Math.max(c.from, c.to);
+    const crashes = { n: 0, ksi: 0, fatal: 0, ped: 0, bike: 0, recent: 0 };
+    for (const [mp, b] of Object.entries(bins[c.roadway] || {})) {
+      if (+mp < lo - 1e-9 || +mp >= hi) continue;
+      for (const k in crashes) crashes[k] += b[k];
+    }
+    entries.push({ id, name: c.title, short: c.short, city: c.city, lanes: c.lanes, roadway: c.roadway, fromMp: c.from, toMp: c.to, length, crashes });
+  }
+  const loaders = entries.map((e) => `  ${JSON.stringify(e.id)}: () => import("./${e.id}-osm.js"),`).join("\n");
+  writeFileSync(new URL("../src/corridors/index.js", import.meta.url),
+    `// GENERATED by scripts/fetch-osm-corridor.mjs. Do not edit; re-run the script instead.\n` +
+    `// Crash totals: FDOT State Safety Office, pedestrian or bicyclist crashes 2011-2022, within each\n` +
+    `// corridor's milepost range (data/lee-crash-bins.json).\n` +
+    `export const CATALOG = ${JSON.stringify(entries, null, 1)};\n\n` +
+    `export const LOADERS = {\n${loaders}\n};\n`);
+  console.log(`\nWrote src/corridors/index.js (${entries.length} corridors)`);
 }
 
 async function fetchCorridor(corridorId) {
+  const REFS = [].concat(CONFIG.ref);
   // FDOT's line for this roadway between the two mileposts: the corridor's extent, direction,
   // and milepost reference. Stations every ~25 m, start end first.
   const stations = await fdotStations(CONFIG.roadway, CONFIG.from, CONFIG.to);
@@ -320,7 +399,7 @@ async function fetchCorridor(corridorId) {
   const [s, w, n, e] = [Math.min(...lats) - PAD, Math.min(...lons) - PAD, Math.max(...lats) + PAD, Math.max(...lons) + PAD];
   const bb = `(${s.toFixed(5)},${w.toFixed(5)},${n.toFixed(5)},${e.toFixed(5)})`;
   const els = await overpass(`[out:json][timeout:120];
-    way["highway"~"^(primary|trunk)$"]["ref"~"${CONFIG.ref}"]${bb}->.main;
+    way["highway"~"^(primary|trunk|secondary)$"]["ref"~"${REFS.join("|")}"]${bb}->.main;
     node(w.main)->.mainNodes;
     (
       .main;
@@ -330,10 +409,10 @@ async function fetchCorridor(corridorId) {
       node["highway"="crossing"]${bb};
       node.mainNodes["highway"="traffic_signals"];
     );out body geom;`);
-  const isMain = (x) => x.type === "way" && /^(primary|trunk)$/.test(x.tags.highway) && (x.tags.ref || "").split(";").map((r) => r.trim()).includes(CONFIG.ref)
+  const isMain = (x) => x.type === "way" && /^(primary|trunk|secondary)$/.test(x.tags.highway) && (x.tags.ref || "").split(";").map((r) => r.trim()).some((r) => REFS.includes(r))
     && (!CONFIG.name || CONFIG.name.test(x.tags.name || ""));
   const carriage = els.filter(isMain);
-  console.log(`OSM ways: ${els.length} (${carriage.length} ${CONFIG.ref} carriageway pieces)`);
+  console.log(`OSM ways: ${els.length} (${carriage.length} carriageway pieces)`);
 
   // Centerline: FDOT's line follows one side of a divided road, a few meters off the middle,
   // and our side-of-road rules work in meters from the middle. So at each FDOT station, look

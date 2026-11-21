@@ -4,9 +4,20 @@ Sightline plans walks and bike rides to work along a busy corridor. It tells the
 
 - **Live site (GitHub Pages, real map):** https://therealdanielmiller.github.io/006---Sightline/
 - **Claude-hosted demo (diagram only, with Ask Claude):** https://claude.ai/artifact/2hRfy4aRJthRczTxsiRPYN. It's private until you share it from that page.
-- **Current state:** a working prototype for two Fort Myers corridors, picked from the Lee County pedestrian and bicyclist crash ranking for 2011–2022 (`data/lee-crash-sections.json`):
-  - **US 41**, 8.5 miles from McGregor / MLK Blvd downtown to Jamaica Bay Blvd. It takes in the three one-mile sections of US 41 with the most crashes.
-  - **SR 80 (Palm Beach Blvd)**, 4.3 miles from Seaboard St past I-75 to Orange River Blvd. It takes in the section with the most deaths and serious injuries in the county.
+- **Current state:** a working prototype for eight Lee County state-road corridors (about 28 miles), picked from the county's pedestrian and bicyclist crash ranking for 2011–2022 (`data/lee-crash-sections.json`). The app lists them worst first, by people killed or seriously injured:
+
+  | Corridor | Miles | Killed or seriously injured | Crashes |
+  |---|---|---|---|
+  | US 41, McGregor / MLK Blvd to Jamaica Bay Blvd | 8.5 | 76 | 297 |
+  | SR 80 (Palm Beach Blvd), Seaboard St past I-75 | 4.3 | 54 | 129 |
+  | SR 865 (San Carlos Blvd), Summerlin area to Fort Myers Beach | 4.5 | 25 | 67 |
+  | SR 78 (Pine Island Rd / Bayshore Rd) at US 41 | 2.7 | 24 | 64 |
+  | SR 82 (Dr. Martin Luther King Jr. Blvd) | 3.0 | 18 | 96 |
+  | US 41 Business (N. Tamiami Trail) | 1.6 | 12 | 25 |
+  | US 41, Bonita Springs | 1.6 | 10 | 35 |
+  | SR 884 (Colonial Blvd), Winkler Ave to Six Mile Cypress | 1.5 | 6 | 24 |
+
+  US 41 and Palm Beach Blvd have hand-written sample places and work zones; the others get generated sample places beside named intersections, labeled "(sample)".
 
   For both, the road geometry, signal locations, crosswalks, free right-turn slip lanes, sidewalks, and bike lanes come from OpenStreetMap. No Turn on Red signs and leading pedestrian intervals aren't verified yet, so none are assumed. Construction events and places are illustrative, not real conditions.
 
@@ -61,6 +72,8 @@ Sightline plans walks and bike rides to work along a busy corridor. It tells the
 | `src/geo.js` | Converts between map coordinates and "meters along the corridor + side" | Rarely |
 | `src/engine.js` | Routing rules and scoring for walk and bike modes (the core logic) | **Yes**, to change safety rules or weights |
 | `src/data.js` | Corridor data: OSM data from `src/corridors/`, field-checked overrides (`FIELD_CHECKED`, per corridor), and the illustrative events and places | **Yes**, to add field-checked rules, events, and places |
+| `src/corridors/index.js` | **Generated**: the corridor list (names, FDOT location, length, crash totals) and a loader per corridor, so the site downloads a corridor only when it's picked | **No** |
+| `data/lee-crash-bins.json` | **Generated** by `scripts/rank-crash-sections.mjs`: crash counts per tenth of a mile on each FDOT roadway (counts only, no records) | No |
 | `src/corridors/<id>-osm.js` | **Generated** by `npm run fetch:osm -- <id>` (`us41`, `sr80`): centerline, intersections, sidewalks, bike lanes, compass | **No**. Edit `CORRIDORS` in the script and re-run it |
 | `scripts/rank-crash-sections.mjs` | Ranks one-mile Lee County road sections by pedestrian/bicyclist crashes into `data/lee-crash-sections.json` | When new crash data arrives |
 | `scripts/fetch-osm-corridor.mjs` | Builds `src/corridors/<id>-osm.js` from OpenStreetMap | Yes, the `CORRIDORS` block (one entry per corridor) |

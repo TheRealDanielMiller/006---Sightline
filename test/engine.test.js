@@ -1,7 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { plan, WEIGHTS } from "../src/engine.js";
-import { SAMPLE_DATA, CORRIDORS, US41_DATA, SR80_DATA } from "../src/data.js";
+import { loadCorridor, loadAllCorridors } from "../src/data.js";
+
+const US41_DATA = await loadCorridor("us41");
+const SR80_DATA = await loadCorridor("sr80");
+const SAMPLE_DATA = US41_DATA;
+const CORRIDORS = await loadAllCorridors();
 
 const CTX = { minutes: 8 * 60, weekend: false, dark: false };
 

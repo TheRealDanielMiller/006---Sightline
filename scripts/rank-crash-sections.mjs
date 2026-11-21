@@ -27,7 +27,13 @@ const files = readdirSync(RAW).filter((f) => /^crashes-p\d+\.geojson$/.test(f)).
 const crashes = new Map();
 for (const f of files) {
   const fc = JSON.parse(readFileSync(`${RAW}/${f}`, "utf8"));
-  for (const { properties: c } of fc.features) crashes.set(c.XID, c);
+  // Map position from the feature geometry. A few records carry 0,0 or out-of-county
+  // coordinates; they keep their road/milepost but don't count toward a section's center.
+  for (const { properties: c, geometry: g } of fc.features) {
+    const [lon, lat] = (g && g.coordinates) || [];
+    const ok = lat > 26.3 && lat < 26.8 && lon > -82.35 && lon < -81.55;
+    crashes.set(c.XID, { ...c, _lat: ok ? lat : null, _lon: ok ? lon : null });
+  }
 }
 const all = [...crashes.values()];
 const placed = all.filter((c) => c.ROADWAYID && c.LOCMP != null);
@@ -71,7 +77,8 @@ for (const [road, rs] of byRoad) {
     best.forEach((j) => used.add(j));
     const w = best.map((j) => rs[j]);
     const from = w[0].LOCMP, to = w.at(-1).LOCMP;
-    const [lon, lat] = [mean(w.map((c) => c.SAFETYLON)), mean(w.map((c) => c.SAFETYLAT))];
+    const located = w.filter((c) => c._lat != null);
+    const [lon, lat] = [median(located.map((c) => c._lon)), median(located.map((c) => c._lat))];
     sections.push({
       roadwayId: road,
       names: top(w, "ON_ROADWAY_NAME", 3),
@@ -91,7 +98,7 @@ for (const [road, rs] of byRoad) {
     });
   }
 }
-function mean(a) { return a.reduce((s, x) => s + x, 0) / a.length; }
+function median(a) { const s = [...a].sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; }
 
 sections.sort((a, b) => b.crashes - a.crashes || b.fatalOrSerious - a.fatalOrSerious);
 sections.forEach((s, i) => (s.rank = i + 1));
@@ -112,3 +119,28 @@ console.table(sections.slice(0, 15).map((s) => ({
   sidewalks: s.sidewalkMiles ? `${s.sidewalkMiles.both}b ${s.sidewalkMiles.one}o ${s.sidewalkMiles.none}g` : "Not covered",
 })));
 console.log(`wrote ${OUT} (${sections.length} sections)`);
+
+// Counts per tenth of a mile on each FDOT roadway, so any corridor (a roadway + milepost range)
+// can total its own crashes, and a map can shade them. Counts only, no crash records.
+const BINS_OUT = "data/lee-crash-bins.json";
+const bins = {};
+for (const c of placed) {
+  const b = Math.floor(c.LOCMP * 10) / 10;
+  const road = (bins[c.ROADWAYID] ||= {});
+  const k = b.toFixed(1);
+  const x = (road[k] ||= { n: 0, ksi: 0, fatal: 0, ped: 0, bike: 0, recent: 0 });
+  x.n++;
+  if (c.NUMBER_OF_KILLED > 0 || c.NUMBER_OF_SERIOUS_INJURIES > 0) x.ksi++;
+  if (c.NUMBER_OF_KILLED > 0) x.fatal++;
+  if (c.NUMBER_OF_PEDESTRIANS > 0) x.ped++;
+  if (c.NUMBER_OF_BICYCLISTS > 0) x.bike++;
+  if (c.CALENDAR_YEAR >= 2019) x.recent++;
+}
+writeFileSync(BINS_OUT, JSON.stringify({
+  source: "FDOT State Safety Office, Lee County pedestrian or bicyclist crashes 2011-2022 (see lee-crash-sections.json)",
+  generated: new Date().toISOString().slice(0, 10),
+  binMiles: 0.1,
+  fields: { n: "crashes", ksi: "killed or seriously injured", fatal: "fatal", ped: "pedestrian involved", bike: "bicyclist involved", recent: "2019-2022" },
+  roadways: bins,
+}) + "\n");
+console.log(`wrote ${BINS_OUT} (${Object.keys(bins).length} roadways)`);
