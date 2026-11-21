@@ -4,7 +4,11 @@ Sightline plans walks and bike rides to work along a busy corridor. It tells the
 
 - **Live site (GitHub Pages, real map):** https://therealdanielmiller.github.io/006---Sightline/
 - **Claude-hosted demo (diagram only, with Ask Claude):** https://claude.ai/artifact/2hRfy4aRJthRczTxsiRPYN. It's private until you share it from that page.
-- **Current state:** a working prototype for 8.5 miles of US 41 in Fort Myers, from McGregor / MLK Blvd downtown to Jamaica Bay Blvd. That stretch takes in the three one-mile sections of US 41 with the most pedestrian and bicyclist crashes in Lee County, 2011–2022 (`data/lee-crash-sections.json`). The road geometry, signal locations, crosswalks, free right-turn slip lanes, sidewalks, and bike lanes come from OpenStreetMap. No Turn on Red signs and leading pedestrian intervals aren't verified yet, so none are assumed. Construction events and places are illustrative, not real conditions.
+- **Current state:** a working prototype for two Fort Myers corridors, picked from the Lee County pedestrian and bicyclist crash ranking for 2011–2022 (`data/lee-crash-sections.json`):
+  - **US 41**, 8.5 miles from McGregor / MLK Blvd downtown to Jamaica Bay Blvd. It takes in the three one-mile sections of US 41 with the most crashes.
+  - **SR 80 (Palm Beach Blvd)**, 4.3 miles from Seaboard St past I-75 to Orange River Blvd. It takes in the section with the most deaths and serious injuries in the county.
+
+  For both, the road geometry, signal locations, crosswalks, free right-turn slip lanes, sidewalks, and bike lanes come from OpenStreetMap. No Turn on Red signs and leading pedestrian intervals aren't verified yet, so none are assumed. Construction events and places are illustrative, not real conditions.
 
 ---
 
@@ -35,7 +39,8 @@ Sightline plans walks and bike rides to work along a busy corridor. It tells the
    You don't need to build for GitHub Pages yourself: pushing to `main` builds and publishes it (see section 6).
 6. Refresh the road geometry from OpenStreetMap (only when you change the corridor or want newer OSM data):
    ```
-   npm run fetch:osm
+   npm run fetch:osm           # every corridor
+   npm run fetch:osm -- sr80   # just one
    ```
 
 **Shortcut:** `.vscode/tasks.json` has these commands. Press **Ctrl+Shift+P → "Tasks: Run Task"** and pick **Dev server**, **Build**, **Test routing**, **Print sample routes**, or **Fetch live data**.
@@ -55,10 +60,10 @@ Sightline plans walks and bike rides to work along a busy corridor. It tells the
 | `src/units.js` | Formats distances for display in feet and miles (the engine and data stay in meters) | Rarely |
 | `src/geo.js` | Converts between map coordinates and "meters along the corridor + side" | Rarely |
 | `src/engine.js` | Routing rules and scoring for walk and bike modes (the core logic) | **Yes**, to change safety rules or weights |
-| `src/data.js` | Corridor data: OSM data from `corridor-osm.js`, field-checked overrides (`FIELD_CHECKED`), and the illustrative events and places | **Yes**, to add field-checked rules, events, and places |
-| `src/corridor-osm.js` | **Generated** by `npm run fetch:osm`: centerline, intersections, sidewalks, bike lanes | **No**. Edit the CONFIG in the script and re-run it |
+| `src/data.js` | Corridor data: OSM data from `src/corridors/`, field-checked overrides (`FIELD_CHECKED`, per corridor), and the illustrative events and places | **Yes**, to add field-checked rules, events, and places |
+| `src/corridors/<id>-osm.js` | **Generated** by `npm run fetch:osm -- <id>` (`us41`, `sr80`): centerline, intersections, sidewalks, bike lanes, compass | **No**. Edit `CORRIDORS` in the script and re-run it |
 | `scripts/rank-crash-sections.mjs` | Ranks one-mile Lee County road sections by pedestrian/bicyclist crashes into `data/lee-crash-sections.json` | When new crash data arrives |
-| `scripts/fetch-osm-corridor.mjs` | Builds `corridor-osm.js` from OpenStreetMap | Yes, the CONFIG and OVERRIDES blocks |
+| `scripts/fetch-osm-corridor.mjs` | Builds `src/corridors/<id>-osm.js` from OpenStreetMap | Yes, the `CORRIDORS` block (one entry per corridor) |
 | `test/*.test.js` | Automated tests for routing, geometry, and map data (`npm test`) | Add cases when you change rules |
 | `scripts/demo-routes.js` | Prints routes for sample trips (`npm run demo`) | Add trips as needed |
 | `vite.config.js` | Build settings for the Pages site and the single-file artifact | Rarely |
@@ -149,9 +154,13 @@ The same format is used by `src/data.js` and by `corridor.json` from the live sc
 }
 ```
 
-**Where the data comes from.** `npm run fetch:osm` pulls the US 41 centerline, the signalized intersections (31 on this stretch, with their side-street legs, lane counts, crosswalks, and slip lanes), sidewalk coverage, and bike lanes from OpenStreetMap into `src/corridor-osm.js`. Intersections are found automatically from OSM traffic-signal nodes and the roads that join there; `OVERRIDES` in the script pins stable ids and short labels. OSM is community-mapped, so spot-check it against aerials.
+**Where the data comes from.** `npm run fetch:osm -- <id>` pulls a corridor's centerline, signalized intersections (with their side-street legs, lane counts, crosswalks, and slip lanes), sidewalk coverage, and bike lanes from OpenStreetMap into `src/corridors/<id>-osm.js`. US 41 has 31 signals and Palm Beach Blvd has 9, including the two I-75 ramp signals. Freeway ramps and single-point-interchange ramps count as side-street legs, because people on foot cross them at the signal.
+
+**Corridors that don't run north–south.** The engine only uses relative codes: position from the start, sides `E`/`W` (left and right of travel from the start), and legs `N`/`S` (back toward the start, or on toward the end). Each generated file carries a `compass` that says what those codes mean on the ground. On Palm Beach Blvd, which runs west to east, `E` is the north side, so the app says "north side" and "eastbound". To add a corridor, add an entry to `CORRIDORS` in the fetch script (`ref`, an optional `name` filter, `axis`, `start`/`end`, `bbox`, `overrides`), run it, and add the corridor's places in `src/data.js`. Intersections are found automatically from OSM traffic-signal nodes and the roads that join there; `OVERRIDES` in the script pins stable ids and short labels. OSM is community-mapped, so spot-check it against aerials.
 
 **Crossings.** The fetch script also reads OSM crossings: a leg has a crosswalk when OSM maps a marked crossing on it, and a corner has a slip lane when OSM maps an unsignalized crossing out on that corner (currently NE, SE, and SW at Daniels / Cypress Lake). Heavy right turns are inferred from slip lanes. A leg with an explicitly unmarked crossing has no crosswalk. A leg with **nothing** mapped (common downtown, north of Colonial Blvd) is assumed to have one and listed in `unverifiedCrosswalks`; the step text tells the walker to look for it. Field-checking those legs and adding them to `FIELD_CHECKED` (or to OSM) clears the flag.
+
+**Known data conflict (SR 80).** FDOT's sidewalk inventory lists no sidewalk from about milepost 5.4 to 5.9, which is the I-75 interchange. OSM maps sidewalks there, possibly built after FDOT's inventory pass. The app uses OSM. This needs a field check.
 
 **First task:** in `src/data.js`, fill in `FIELD_CHECKED` from a field visit or FDOT: No Turn on Red signs, leading pedestrian intervals, heavy right turns without slip lanes, and any crosswalk OSM gets wrong. Then replace the sample events and places. You know this corridor, and anyone from FDOT District 1 who sees the demo will too. `fetch_live.py` doesn't fill in `bikeFacilities` yet, so a corridor file it writes treats the whole road as having no bike facility.
 

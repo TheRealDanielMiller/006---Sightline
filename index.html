@@ -40,6 +40,7 @@
   section.plan h2 { margin: 0 0 4px; font-size: 24px; letter-spacing: -0.02em; }
   .sub { color: var(--muted); margin: 0 0 18px; font-size: 15px; }
   form.od { display: grid; grid-template-columns: 1fr auto 1fr 150px 140px auto; gap: 12px; align-items: end; }
+  .corridor-pick { max-width: 420px; margin: 0 0 14px; }
   label { display: block; font-size: 13px; font-weight: 600; color: var(--ink2); margin-bottom: 6px; }
   select, input[type=time], input[type=text] { width: 100%; font: 500 15px "Public Sans", sans-serif; padding: 11px 12px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink); }
   select:focus, input:focus { outline: 2px solid var(--route); outline-offset: 1px; border-color: transparent; }
@@ -186,7 +187,8 @@
 
   <section class="plan" id="plan">
     <h2>Where are you headed?</h2>
-    <p class="sub" id="corridorSub">Demo corridor: US 41 (S. Tamiami Trail) near Six Mile Cypress Pkwy, Fort Myers.</p>
+    <p class="sub" id="corridorSub">Demo corridor: US 41 (Cleveland Ave / S. Tamiami Trail), Fort Myers.</p>
+    <div class="corridor-pick"><label for="corridorPick">Corridor</label><select id="corridorPick"></select></div>
     <div class="mode" role="radiogroup" aria-label="Travel mode">
       <input type="radio" name="mode" id="modeWalk" value="walk" checked><label for="modeWalk">Walk</label>
       <input type="radio" name="mode" id="modeBike" value="bike"><label for="modeBike">Bike</label>

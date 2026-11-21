@@ -1,9 +1,15 @@
 #!/usr/bin/env node
-// Builds src/corridor-osm.js from OpenStreetMap: the corridor centerline, where each
+// Builds src/corridors/<id>-osm.js from OpenStreetMap: the corridor centerline, where each
 // signalized intersection sits along it, which of its legs have a marked crosswalk, which
 // corners have a free right-turn slip lane, and sidewalk / bike-lane coverage on each side.
 //
-// Usage: npm run fetch:osm
+// Usage: npm run fetch:osm -- us41     (or sr80; no argument fetches every corridor)
+//
+// A corridor is one road between two points. "Start" is position 0; positions grow toward
+// the far end. Sides "E"/"W" are left/right of travel from the start (east/west for a road
+// run north to south) and legs "N"/"S" point back toward the start / on toward the end.
+// The engine only ever uses those relative codes; `compass` in the output says what they
+// mean on the ground so the app can say "north side" on an east-west road.
 //
 // Signalized intersections are found automatically: traffic-signal nodes on the corridor's
 // carriageways, grouped, with their side streets (which side they leave on, name, lane
@@ -15,22 +21,25 @@
 import { writeFileSync } from "node:fs";
 import { makeFrame } from "../src/geo.js";
 
-const CONFIG = {
-  ref: "US 41",
-  north: 26.6416, // corridor north end (latitude): just north of Dr. Martin Luther King Jr. Blvd (SR 82)
-  south: 26.5195, // corridor south end: just south of Jamaica Bay Blvd
-  bbox: [26.515, -81.885, 26.646, -81.860], // south, west, north, east
+const DEFAULTS = {
   maxOffsetM: 45, // how far from the centerline a sidewalk or path can be and still count
   mergeGapM: 35, // join sidewalk pieces split by driveways or side-street crossings
   signalGroupM: 60, // signal nodes closer than this along the road are one intersection
   sideRoadMinM: 22, // a side street must reach this far from the centerline to count as a leg
 };
 
-// Stable ids and labels for detected intersections, matched by name (or, where OSM gives
-// no usable name, by latitude within 60 m).
-const OVERRIDES = [
+// Overrides give detected intersections stable ids and labels, matched by name (or, where OSM
+// gives no usable name, by being within 60 m of `near` [lat, lon]).
+const CORRIDORS = {
+  us41: {
+    ref: "US 41",
+    axis: "lat", // sample the centerline along latitude (a north-south road)
+    start: 26.6416, // just north of McGregor Blvd / Dr. Martin Luther King Jr. Blvd (SR 82)
+    end: 26.5195, // just south of Jamaica Bay Blvd
+    bbox: [26.515, -81.885, 26.646, -81.860], // south, west, north, east
+    overrides: [
   { match: /Martin Luther King/, id: "mlk", name: "McGregor Blvd / Dr. Martin Luther King Jr. Blvd (SR 82)", short: "McGregor / MLK" },
-  { lat: 26.5969, id: "colonial", name: "Colonial Blvd (interchange ramps)", short: "Colonial Blvd" },
+  { near: [26.5969, -81.8718], id: "colonial", name: "Colonial Blvd (interchange ramps)", short: "Colonial Blvd" },
   { match: /Seven Lakes/, id: "sevenlakes", name: "Seven Lakes Blvd / Big Pine Way", short: "Seven Lakes" },
   { match: /^Cypress Trace/, id: "cypresstrace" },
   { match: /Daniels/, id: "daniels", name: "Daniels Pkwy / Cypress Lake Dr", short: "Daniels / Cypress Lake" },
@@ -38,11 +47,36 @@ const OVERRIDES = [
   { match: /Lakeridge/, id: "lakeridge", name: "Lakeridge Ct / Andrea Ln", short: "Lakeridge" },
   { match: /Six Mile/, id: "sixmile", name: "Six Mile Cypress Pkwy / Gladiolus Dr", short: "Six Mile Cypress" },
   { match: /Jamaica Bay/, id: "jamaicabay" },
-];
-// Roads that can be a side-street leg. Ramps count only at single-point interchanges, where
-// people on foot cross them at the signal (e.g. Colonial Blvd over US 41).
+    ],
+  },
+  sr80: {
+    ref: "SR 80",
+    name: /Palm Beach/, // SR 80 also runs on Seaboard St and the downtown one-way pair
+    axis: "lon", // sample along longitude (a west-east road)
+    start: -81.8540, // just west of Seaboard St
+    end: -81.7945, // just east of Ortiz Ave
+    bbox: [26.645, -81.858, 26.692, -81.790],
+    overrides: [
+      { match: /Riverside/, id: "riverside" },
+      { match: /Shoemaker/, id: "shoemaker", name: "Veronica S. Shoemaker Blvd", short: "Shoemaker Blvd" },
+      { match: /^Marsh/, id: "marsh" },
+      { match: /New York/, id: "newyork", name: "Tice St / New York Dr", short: "New York Dr" },
+      { match: /^Ortiz/, id: "ortiz" },
+      { match: /^Underwood/, id: "underwood" },
+      { near: [26.68347, -81.79992], id: "i75west", name: "I-75 ramps (west side of the interchange)", short: "I-75 west ramps" },
+      { near: [26.68469, -81.79779], id: "i75east", name: "I-75 ramps (east side of the interchange)", short: "I-75 east ramps" },
+      { match: /Orange River/, id: "orangeriver", name: "Orange River Blvd / Louise St", short: "Orange River Blvd" },
+    ],
+  },
+};
+const CORRIDOR_ID = process.argv[2];
+let CONFIG, OVERRIDES;
+// Roads that can be a side-street leg. Ramps count where people on foot cross them at a
+// signal: single-point interchanges (Colonial Blvd over US 41) and freeway ramp terminals
+// (I-75 at Palm Beach Blvd). Ordinary turn-lane links don't.
 const isSideRoad = (t) => /^(primary|secondary|tertiary|unclassified|residential|service|living_street)$/.test(t.highway || "")
-  || (/_link$/.test(t.highway || "") && t.junction === "spui");
+  || (/_link$/.test(t.highway || "") && t.junction === "spui")
+  || t.highway === "motorway_link";
 const RANK = { primary: 6, secondary: 5, tertiary: 4, unclassified: 3, residential: 2, living_street: 1, service: 0 };
 // Shorter labels: "North Airport Road" -> "N Airport Rd". A direction word is abbreviated only
 // when a name follows it, so "South Street" stays "South St".
@@ -174,10 +208,12 @@ function findIntersections(frame, els, carriage) {
     if (legs.length === 2) continue;
     const pos = round(here.reduce((t, j) => t + j.pos, 0) / here.length);
     const realName = (n) => n && !["driveway", "unnamed road", "ramps"].includes(n);
-    const nameList = [...new Set([names.W, names.E].filter(realName))];
+    // One street often carries two spellings ("Veronica S. Shoemaker" / "Veronica S Shoemaker").
+    const key = (n) => n.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const nameList = [...new Map([names.W, names.E].filter(realName).map((n) => [key(n), n])).values()];
     const name = nameList.join(" / ") || "Driveway signal";
-    const lat = frame.at(pos)[0];
-    const o = OVERRIDES.find((x) => (x.match ? x.match.test(name) : Math.abs(x.lat - lat) * 111000 < 60)) || {};
+    const ll = frame.at(pos);
+    const o = OVERRIDES.find((x) => (x.match ? x.match.test(name) : Math.hypot((x.near[0] - ll[0]) * 111000, (x.near[1] - ll[1]) * 99500) < 60)) || {};
     const id = o.id || name.toLowerCase().replace(/\b(street|avenue|road|boulevard|drive|way|lane|court|parkway|terrace)\b/g, "").replace(/[^a-z0-9]+/g, "");
     const short = o.short || abbreviate(nameList.length > 1 ? nameList[0] : name);
     // legNames: what you actually cross on each side, e.g. a driveway opposite a named street.
@@ -202,6 +238,16 @@ function wayLanes(w) {
 const toRanges = (r) => merge(r, CONFIG.mergeGapM).map(([from, to]) => ({ from: round(from), to: round(to) })).filter((s) => s.to - s.from >= 10);
 
 async function main() {
+  const ids = CORRIDOR_ID ? [CORRIDOR_ID] : Object.keys(CORRIDORS);
+  for (const id of ids) {
+    if (!CORRIDORS[id]) throw new Error(`unknown corridor "${id}"; known: ${Object.keys(CORRIDORS).join(", ")}`);
+    CONFIG = { ...DEFAULTS, ...CORRIDORS[id] }; OVERRIDES = CONFIG.overrides;
+    console.log(`\n== ${id} (${CONFIG.ref}) ==`);
+    await fetchCorridor(id);
+  }
+}
+
+async function fetchCorridor(corridorId) {
   const [s, w, n, e] = CONFIG.bbox;
   const bb = `(${s},${w},${n},${e})`;
   const els = await overpass(`[out:json][timeout:120];
@@ -215,37 +261,48 @@ async function main() {
       node["highway"="crossing"]${bb};
       node.mainNodes["highway"="traffic_signals"];
     );out body geom;`);
-  const isMain = (x) => x.type === "way" && /^(primary|trunk)$/.test(x.tags.highway) && (x.tags.ref || "").includes(CONFIG.ref);
+  const isMain = (x) => x.type === "way" && /^(primary|trunk)$/.test(x.tags.highway) && (x.tags.ref || "").split(";").map((r) => r.trim()).includes(CONFIG.ref)
+    && (!CONFIG.name || CONFIG.name.test(x.tags.name || ""));
   const carriage = els.filter(isMain);
   console.log(`OSM ways: ${els.length} (${carriage.length} ${CONFIG.ref} carriageway pieces)`);
 
-  // Centerline: at fixed latitudes (~25 m apart), find where each one-way carriageway
-  // crosses that latitude and average the two. (Assumes the road runs roughly north-south.)
-  const segs = { N: [], S: [] };
+  // Centerline: step along the axis (~25 m apart) from start to end; at each step find where
+  // each carriageway crosses it and average the two directions. A two-way (undivided) piece
+  // counts for both. Assumes the road keeps moving along the axis (no doubling back).
+  const A = CONFIG.axis, B = A === "lat" ? "lon" : "lat";
+  const dirSign = Math.sign(CONFIG.end - CONFIG.start); // +1 if the axis value grows toward the end
+  const segs = { N: [], S: [] }; // N: carriageways heading back toward the start; S: toward the end
   for (const way of carriage) {
     const g = way.geometry;
-    const dir = g[g.length - 1].lat > g[0].lat ? "N" : "S";
-    for (let i = 0; i < g.length - 1; i++) segs[dir].push([g[i], g[i + 1]]);
+    const twoWay = way.tags.oneway !== "yes" && way.tags.oneway !== "-1";
+    const toEnd = Math.sign(g[g.length - 1][A] - g[0][A]) === dirSign;
+    for (let i = 0; i < g.length - 1; i++) {
+      if (twoWay || toEnd) segs.S.push([g[i], g[i + 1]]);
+      if (twoWay || !toEnd) segs.N.push([g[i], g[i + 1]]);
+    }
   }
-  const lonAt = (dir, lat) => {
+  const crossAt = (dir, v) => {
     const xs = [];
     for (const [a, b] of segs[dir]) {
-      if ((a.lat - lat) * (b.lat - lat) > 0 || a.lat === b.lat) continue;
-      xs.push(a.lon + ((lat - a.lat) / (b.lat - a.lat)) * (b.lon - a.lon));
+      if ((a[A] - v) * (b[A] - v) > 0 || a[A] === b[A]) continue;
+      xs.push(a[B] + ((v - a[A]) / (b[A] - a[A])) * (b[B] - a[B]));
     }
     xs.sort((x, y) => x - y);
     return xs.length ? xs[Math.floor(xs.length / 2)] : null;
   };
-  const STEP = 0.000225;
+  const STEP = A === "lat" ? 0.000225 : 0.00025;
   let line = [], lastGap = null;
-  for (let lat = CONFIG.north; lat >= CONFIG.south - 1e-9; lat -= STEP) {
-    const nb = lonAt("N", lat), sb = lonAt("S", lat);
-    let lon;
-    if (nb != null && sb != null) { lon = (nb + sb) / 2; lastGap = nb - sb; }
-    else if (nb != null && lastGap != null) lon = nb - lastGap / 2;
-    else if (sb != null && lastGap != null) lon = sb + lastGap / 2;
+  const steps = Math.floor(Math.abs(CONFIG.end - CONFIG.start) / STEP + 1e-6);
+  for (let k = 0; k <= steps; k++) {
+    const v = CONFIG.start + dirSign * k * STEP;
+    const nb = crossAt("N", v), sb = crossAt("S", v);
+    let w;
+    if (nb != null && sb != null) { w = (nb + sb) / 2; lastGap = nb - sb; }
+    else if (nb != null && lastGap != null) w = nb - lastGap / 2;
+    else if (sb != null && lastGap != null) w = sb + lastGap / 2;
     else continue;
-    line.push([+lat.toFixed(6), +lon.toFixed(6)]);
+    const pt = A === "lat" ? [v, w] : [w, v];
+    line.push([+pt[0].toFixed(6), +pt[1].toFixed(6)]);
   }
   const frame = makeFrame(line);
   console.log(`Centerline: ${line.length} points, ${round(frame.length)} m`);
@@ -316,7 +373,17 @@ async function main() {
     console.log(`  ${String(I.pos).padStart(5)} m  ${I.id.padEnd(16)} ${I.name} [${I.legs.join("")}, ${I.crossLanes} lanes]  crosswalks: ${missing.length ? "NONE on " + missing.join(",") : "all legs"}${unk.length ? " (unmapped: " + unk.join(",") + ")" : ""}${I.slipCorners.length ? "  slip lanes: " + I.slipCorners.join(",") : ""}`);
   }
 
+  // What the relative codes mean on the ground, from the overall direction start -> end.
+  const [la0, lo0] = line[0], [la1, lo1] = line.at(-1);
+  const dx = (lo1 - lo0) * Math.cos((la0 * Math.PI) / 180), dy = la1 - la0;
+  const travel = Math.abs(dy) >= Math.abs(dx) ? (dy < 0 ? "south" : "north") : (dx > 0 ? "east" : "west");
+  const OPPOSITE = { north: "south", south: "north", east: "west", west: "east" };
+  const LEFT_OF = { south: "east", north: "west", east: "north", west: "south" };
+  const compass = { S: travel, N: OPPOSITE[travel], E: LEFT_OF[travel], W: OPPOSITE[LEFT_OF[travel]] };
+
   const out = {
+    id: corridorId,
+    compass,
     source: "OpenStreetMap (© OpenStreetMap contributors, ODbL)",
     fetchedAt: new Date().toISOString().slice(0, 10),
     length: round(frame.length),
@@ -325,11 +392,11 @@ async function main() {
     sidewalks,
     bikeFacilities,
   };
-  writeFileSync(new URL("../src/corridor-osm.js", import.meta.url),
+  writeFileSync(new URL(`../src/corridors/${corridorId}-osm.js`, import.meta.url),
     `// GENERATED by scripts/fetch-osm-corridor.mjs. Do not edit; re-run the script instead.\n` +
     `// Map data © OpenStreetMap contributors, available under the Open Database License (ODbL).\n` +
     `export const OSM_CORRIDOR = ${JSON.stringify(out, null, 1)};\n`);
-  console.log("Wrote src/corridor-osm.js");
+  console.log(`Wrote src/corridors/${corridorId}-osm.js (start = ${compass.N} end; sides E/W = ${compass.E}/${compass.W})`);
 }
 
 main().catch((e) => { console.error("Failed:", e.message); process.exit(1); });

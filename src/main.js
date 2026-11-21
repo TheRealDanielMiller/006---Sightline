@@ -1,10 +1,23 @@
 import { plan, gapsFor, facilityAt, SPEED_M_PER_MIN } from "./engine.js";
-import { SAMPLE_DATA } from "./data.js";
+import { CORRIDORS } from "./data.js";
 import { fmtDist, fmtFeet, fmtMiles } from "./units.js";
 
-let DATA = SAMPLE_DATA;
+let DATA = CORRIDORS[0];
 const $ = (id) => document.getElementById(id);
-const WORD = { E: "east", W: "west", N: "north", S: "south" };
+// Compass words for the relative codes. Sides E/W are left/right of travel from the corridor's
+// start; legs N/S point back toward the start / on toward the end. On US 41 (run north to
+// south) they mean what they say; on Palm Beach Blvd (run west to east) "E" is the north side.
+const NS_FIRST = { north: 0, south: 0, east: 1, west: 1 };
+let WORD = { E: "east", W: "west", N: "north", S: "south" };
+let CORNER_WORD = {};
+function setCompass(d) {
+  WORD = { E: "east", W: "west", N: "north", S: "south", ...((d.corridor || {}).compass || {}) };
+  CORNER_WORD = {};
+  for (const leg of ["N", "S"]) for (const side of ["E", "W"]) {
+    CORNER_WORD[leg + side] = [WORD[leg], WORD[side]].sort((a, b) => NS_FIRST[a] - NS_FIRST[b]).join("");
+  }
+}
+setCompass(DATA);
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const short = (I) => I.short || I.name;
@@ -12,7 +25,7 @@ const short = (I) => I.short || I.name;
 const legLabel = (I, side, full = false) => {
   const n = (I.legNames || {})[side];
   if (!n) return full ? I.name : short(I);
-  if (n === "ramps") return `the ${short(I)} ramps`;
+  if (n === "ramps") return /ramps$/i.test(short(I)) ? `the ${short(I)}` : `the ${short(I)} ramps`;
   if (n === "driveway" || n === "unnamed road") return `the ${n === "driveway" ? "driveway" : "side road"} opposite ${short(I)}`;
   return n;
 };
@@ -21,6 +34,19 @@ let last = null;
 const selectedMode = () => (document.querySelector('input[name="mode"]:checked') || {}).value || "walk";
 const FAC_WORD = { lane: "bike lane", protected: "protected bike lane", path: "shared-use path" };
 const minutesFor = (meters, mode) => Math.max(1, Math.round(meters / SPEED_M_PER_MIN[mode]));
+
+function fillCorridors() {
+  const sel = $("corridorPick");
+  if (!sel) return;
+  sel.innerHTML = CORRIDORS.map((c, i) => `<option value="${i}">${esc(c.corridor.name)}</option>`).join("");
+  sel.value = String(Math.max(0, CORRIDORS.indexOf(DATA)));
+  sel.closest("[hidden]")?.removeAttribute("hidden");
+}
+function useCorridor(d) {
+  DATA = d; setCompass(d); fillPlaces();
+  $("results").classList.remove("show");
+  last = null;
+}
 
 function fillPlaces() {
   const opts = DATA.places.map((p) => `<option value="${esc(p.id)}">${esc(p.name)} (${WORD[p.side]} side)</option>`).join("");
@@ -51,7 +77,7 @@ function describe(r) {
   for (const a of r.acts) {
     if (a.type === "walk") {
       if (a.len < 1) continue;
-      const d = a.to > a.from ? "south" : "north";
+      const d = a.to > a.from ? WORD.S : WORD.N;
       const flags = [];
       const gapTotal = a.notes.filter((n) => n.kind === "gap").reduce((t, n) => t + n.m, 0);
       for (const note of a.notes) {
@@ -105,7 +131,7 @@ function describe(r) {
       n++; a.n = n;
       const flags = [];
       const cls = a.blind || (a.slip && a.slip.length) ? "warn" : "go";
-      const approachDir = a.leg === "N" ? "southbound" : "northbound";
+      const approachDir = (a.leg === "N" ? WORD.S : WORD.N) + "bound";
       const otherLeg = a.leg === "N" ? "S" : "N";
       if (a.ntor) flags.push({ cls: "go", text: `"No Turn on Red" is posted for ${approachDir} ${US()} drivers here.` });
       else if (a.visible) flags.push({ cls: "go", text: `${cap(approachDir)} drivers turning right on red look left for traffic, which is toward you on this crosswalk.` });
@@ -125,7 +151,6 @@ function describe(r) {
 const unverified = (I, leg) => (I.unverifiedCrosswalks || []).includes(leg);
 const UNVERIFIED_FLAG = { cls: "warn", text: "This crosswalk isn't in our map data yet. Look for the marked crosswalk and push button; if there isn't one, cross only on the walk signal." };
 
-const CORNER_WORD = { NE: "northeast", NW: "northwest", SE: "southeast", SW: "southwest" };
 function slipFlag(a) {
   const where = a.slip.map((c) => CORNER_WORD[c]).join(" and ");
   const many = a.slip.length > 1;
@@ -256,9 +281,9 @@ function drawMap(r) {
     s += `<line x1="${X[p.side]}" y1="${py}" x2="${px}" y2="${py}" stroke="#13263a" stroke-width="2"/>`;
     s += `<circle cx="${px}" cy="${py}" r="11" fill="#13263a"/><text x="${px}" y="${py + 4}" font-size="12" font-weight="800" fill="#fff" text-anchor="middle">${lbl}</text>`;
   }
-  s += `<text x="190" y="${top - 18}" font-size="12" font-weight="800" fill="#13263a" text-anchor="middle">${esc(DATA.corridor.short)} · N ↑${lo > 0 ? " (continues)" : ""}</text>`;
+  s += `<text x="190" y="${top - 18}" font-size="12" font-weight="800" fill="#13263a" text-anchor="middle">${esc(DATA.corridor.short)} · ${WORD.N} end ↑${lo > 0 ? " (continues)" : ""}</text>`;
   if (hi < L) s += `<text x="190" y="${H - 22}" font-size="10.5" fill="#fff" text-anchor="middle">continues ↓</text>`;
-  s += `<text x="${X.W}" y="${H - 8}" font-size="10.5" fill="#44566a" text-anchor="middle">west side</text><text x="${X.E}" y="${H - 8}" font-size="10.5" fill="#44566a" text-anchor="middle">east side</text>`;
+  s += `<text x="${X.W}" y="${H - 8}" font-size="10.5" fill="#44566a" text-anchor="middle">${WORD.W} side</text><text x="${X.E}" y="${H - 8}" font-size="10.5" fill="#44566a" text-anchor="middle">${WORD.E} side</text>`;
   s += `</svg>`;
   $("map").innerHTML = s;
 }
@@ -415,6 +440,7 @@ function run() {
 }
 
 // ---------- events ----------
+$("corridorPick") && $("corridorPick").addEventListener("change", (e) => useCorridor(CORRIDORS[+e.target.value]));
 $("startBtn").addEventListener("click", () => { $("plan").scrollIntoView({ behavior: "smooth" }); setTimeout(() => $("orig").focus(), 400); });
 $("swapBtn").addEventListener("click", () => { const a = $("orig").value; $("orig").value = $("dest").value; $("dest").value = a; });
 $("odForm").addEventListener("submit", (e) => { e.preventDefault(); run(); });
@@ -433,7 +459,7 @@ $("fileIn").addEventListener("change", async (e) => {
     const f = e.target.files[0]; if (!f) return;
     const j = JSON.parse(await f.text());
     for (const k of ["corridor", "intersections", "sidewalks", "events", "places"]) if (!j[k]) throw new Error("missing '" + k + "'");
-    DATA = j; fillPlaces(); $("results").classList.remove("show");
+    useCorridor(j);
     $("dataNote").innerHTML = "Using the corridor file you loaded (" + esc(f.name) + ")." + (hasLine(j) ? "" : " It has no road geometry (<code>corridor.line</code>), so only the diagram is shown.");
   } catch (err) { $("fileErr").textContent = "Couldn't read that file: " + err.message; }
 });
@@ -482,4 +508,5 @@ $("aiQ").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.prevent
   } catch (e) { sample = null; }
 })();
 
+fillCorridors();
 fillPlaces();

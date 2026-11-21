@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { plan, WEIGHTS } from "../src/engine.js";
-import { SAMPLE_DATA } from "../src/data.js";
+import { SAMPLE_DATA, CORRIDORS, US41_DATA, SR80_DATA } from "../src/data.js";
 
 const CTX = { minutes: 8 * 60, weekend: false, dark: false };
 
@@ -122,17 +122,37 @@ test("walk mode ignores bike-only factors", () => {
   assert.equal(r.exposure.noFacilityM, 0);
 });
 
-test("sample data: every sample trip routes in both modes", () => {
-  const P = SAMPLE_DATA.places;
-  for (const mode of ["walk", "bike"]) {
-    for (const o of P) for (const d of P) {
-      if (o.id === d.id) continue;
-      const r = plan(SAMPLE_DATA, o, d, CTX, { mode });
-      assert.ok(r.safe && r.typical, `${mode} ${o.id}->${d.id}`);
-      assert.equal(r.safe.mode, mode);
-      assert.ok(r.typical.exposure.distance <= r.safe.exposure.distance + 1e-9, `${mode} ${o.id}->${d.id}: typical should be the shortest`);
+test("sample data: every sample trip on every corridor routes in both modes", () => {
+  for (const D of CORRIDORS) {
+    const P = D.places;
+    for (const mode of ["walk", "bike"]) {
+      for (const o of P) for (const d of P) {
+        if (o.id === d.id) continue;
+        const r = plan(D, o, d, CTX, { mode });
+        assert.ok(r.safe && r.typical, `${D.id} ${mode} ${o.id}->${d.id}`);
+        assert.equal(r.safe.mode, mode);
+        assert.ok(r.typical.exposure.distance <= r.safe.exposure.distance + 1e-9, `${D.id} ${mode} ${o.id}->${d.id}: typical should be the shortest`);
+      }
     }
   }
+});
+
+test("corridors say what their relative codes mean on the ground", () => {
+  assert.deepEqual(US41_DATA.corridor.compass, { S: "south", N: "north", E: "east", W: "west" });
+  // Palm Beach Blvd runs west to east: the start is the west end, and the left of travel is north.
+  assert.deepEqual(SR80_DATA.corridor.compass, { S: "east", N: "west", E: "north", W: "south" });
+  const [w, e] = [SR80_DATA.corridor.line[0], SR80_DATA.corridor.line.at(-1)];
+  assert.ok(e[1] > w[1] && e[0] > w[0], "SR 80 heads east-northeast from the start");
+});
+
+test("Palm Beach Blvd: I-75 ramp signals are crossings, places sit in order", () => {
+  const ids = SR80_DATA.intersections.map((I) => I.id);
+  for (const id of ["shoemaker", "marsh", "newyork", "ortiz", "i75west", "i75east"]) assert.ok(ids.includes(id), id);
+  const ramps = SR80_DATA.intersections.find((I) => I.id === "i75west");
+  assert.deepEqual(ramps.legNames, { E: "ramps", W: "ramps" });
+  const pos = SR80_DATA.places.map((p) => p.pos);
+  assert.deepEqual(pos, [...pos].sort((a, b) => a - b), "places listed west to east");
+  assert.ok(pos.every((p) => p > 0 && p < SR80_DATA.corridor.length));
 });
 
 test("slip-lane corners add a penalty to crosswalks that start or end there", () => {
