@@ -5,3 +5,6 @@ __pycache__/
 node_modules/
 dist/
 dist-artifact/
+
+# Raw source extracts (crash records etc.): keep local, commit only derived summaries
+data/raw/

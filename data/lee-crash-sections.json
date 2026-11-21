@@ -1,0 +1,1445 @@
+{
+ "source": "FDOT State Safety Office (ssogis FeatureServer layer 2000), Lee County, pedestrian or bicyclist crashes; sidewalks from FDOT Sidewalks_and_Gaps_TDA",
+ "generated": "2026-11-21",
+ "crashesByYear": {
+  "2011": 166,
+  "2012": 265,
+  "2013": 345,
+  "2014": 369,
+  "2015": 381,
+  "2016": 408,
+  "2017": 415,
+  "2018": 397,
+  "2019": 118,
+  "2020": 100,
+  "2021": 45,
+  "2022": 39
+ },
+ "note": "Public layer thins after 2018; 2019-2022 counts are a check, not a trend. Sections with sidewalkMiles null are outside FDOT's sidewalk inventory (Not covered).",
+ "sections": [
+  {
+   "roadwayId": "12010000",
+   "names": [
+    "CLEVELAND AVE",
+    "CLEVELAND AVE N",
+    "US 41"
+   ],
+   "fromMp": 21.298,
+   "toMp": 22.298,
+   "crossStreets": [
+    "HILL AVE",
+    "HANSON ST",
+    "CLEVELAND AVE",
+    "BRAMAN AVE",
+    "COLLIER AVE"
+   ],
+   "center": [
+    -80.84868,
+    26.28349
+   ],
+   "crashes": 80,
+   "base2011to2018": 66,
+   "check2019to2022": 14,
+   "pedestrian": 42,
+   "bicyclist": 38,
+   "fatal": 6,
+   "fatalOrSerious": 21,
+   "dark": 19,
+   "atIntersection": 52,
+   "sidewalkMiles": {
+    "both": 1,
+    "one": 0,
+    "none": 0
+   },
+   "rank": 1
+  },
+  {
+   "roadwayId": "12020000",
+   "names": [
+    "SR 80",
+    "PALM BEACH BLVD",
+    "ORTIZ AVE"
+   ],
+   "fromMp": 3.504,
+   "toMp": 4.493,
+   "crossStreets": [
+    "PALM BEACH BLVD",
+    "FAIRFAX DR",
+    "NEW YORK DR",
+    "ROYAL PALM PARK RD",
+    "ADAMS AVE"
+   ],
+   "center": [
+    -79.22188,
+    25.82571
+   ],
+   "crashes": 63,
+   "base2011to2018": 41,
+   "check2019to2022": 22,
+   "pedestrian": 36,
+   "bicyclist": 27,
+   "fatal": 10,
+   "fatalOrSerious": 31,
+   "dark": 26,
+   "atIntersection": 43,
+   "sidewalkMiles": {
+    "both": 0.99,
+    "one": 0,
+    "none": 0
+   },
+   "rank": 2
+  },
+  {
+   "roadwayId": "12010000",
+   "names": [
+    "US 41",
+    "CLEVELAND AVE S",
+    "CLEVELAND AVE"
+   ],
+   "fromMp": 18.195,
+   "toMp": 19.171,
+   "crossStreets": [
+    "PALM DR",
+    "CRYSTAL DR",
+    "US 41",
+    "BEACON MANOR DR",
+    "PINE DR"
+   ],
+   "center": [
+    -80.50736,
+    26.12708
+   ],
+   "crashes": 60,
+   "base2011to2018": 50,
+   "check2019to2022": 10,
+   "pedestrian": 21,
+   "bicyclist": 39,
+   "fatal": 7,
+   "fatalOrSerious": 17,
+   "dark": 24,
+   "atIntersection": 45,
+   "sidewalkMiles": {
+    "both": 0.98,
+    "one": 0,
+    "none": 0
+   },
+   "rank": 3
+  },
+  {
+   "roadwayId": "12070000",
+   "names": [
+    "SR 82",
+    "M L KING BLVD",
+    "DR MARTIN LUTHER KING B"
+   ],
+   "fromMp": 1.019,
+   "toMp": 1.993,
+   "crossStreets": [
+    "STARNES AVE",
+    "SR 82",
+    "FRENCH ST",
+    "VERONICA SHOEMAKER BLVD",
+    "FORD ST"
+   ],
+   "center": [
+    -81.84631,
+    26.64095
+   ],
+   "crashes": 59,
+   "base2011to2018": 47,
+   "check2019to2022": 12,
+   "pedestrian": 24,
+   "bicyclist": 35,
+   "fatal": 3,
+   "fatalOrSerious": 14,
+   "dark": 19,
+   "atIntersection": 46,
+   "sidewalkMiles": {
+    "both": 0.97,
+    "one": 0,
+    "none": 0
+   },
+   "rank": 4
+  },
+  {
+   "roadwayId": "12010000",
+   "names": [
+    "CLEVELAND AVE",
+    "US 41",
+    "LLEWELLYN DR/LEE MEM"
+   ],
+   "fromMp": 22.3,
+   "toMp": 23.279,
+   "crossStreets": [
+    "LINHART AVE",
+    "CLEVELAND AVE",
+    "CANAL ST",
+    "SOUTH ST",
+    "FRANKLIN ST"
+   ],
+   "center": [
+    -80.46082,
+    26.17064
+   ],
+   "crashes": 58,
+   "base2011to2018": 48,
+   "check2019to2022": 10,
+   "pedestrian": 38,
+   "bicyclist": 20,
+   "fatal": 2,
+   "fatalOrSerious": 11,
+   "dark": 16,
+   "atIntersection": 42,
+   "sidewalkMiles": {
+    "both": 0.98,
+    "one": 0,
+    "none": 0
+   },
+   "rank": 5
+  },
+  {
+   "roadwayId": "12020000",
+   "names": [
+    "PALM BEACH BLVD",
+    "SR 80",
+    "VAN BUREN ST"
+   ],
+   "fromMp": 2.504,
+   "toMp": 3.453,
+   "crossStreets": [
+    "PALM BEACH BLVD",
+    "MARSH AVE",
+    "VERONICA S SHOEMAKER",
+    "POLK ST",
+    "OLEANDER AVE"
+   ],
+   "center": [
+    -79.88513,
+    26.02965
+   ],
+   "crashes": 42,
+   "base2011to2018": 32,
+   "check2019to2022": 10,
+   "pedestrian": 23,
+   "bicyclist": 19,
+   "fatal": 3,
+   "fatalOrSerious": 16,
+   "dark": 15,
+   "atIntersection": 26,
+   "sidewalkMiles": {
+    "both": 0.95,
+    "one": 0,
+    "none": 0
+   },
+   "rank": 6
+  },
+  {
+   "roadwayId": "12530000",
+   "names": [
+    "ESTERO BLVD",
+    "CR-865",
+    "ESTERO"
+   ],
+   "fromMp": 8.993,
+   "toMp": 9.838,
+   "crossStreets": [
+    "PALERMO CIR",
+    "CRESCENT ST",
+    "AVENUE C",
+    "TROPICAL SHORES",
+    "CAROLINA AVE"
+   ],
+   "center": [
+    -81.94939,
+    26.45094
+   ],
+   "crashes": 38,
+   "base2011to2018": 38,
+   "check2019to2022": 0,
+   "pedestrian": 15,
+   "bicyclist": 23,
+   "fatal": 0,
+   "fatalOrSerious": 2,
+   "dark": 13,
+   "atIntersection": 7,
+   "sidewalkMiles": null,
+   "rank": 7
+  },
+  {
+   "roadwayId": "12060000",
+   "names": [
+    "SR 78",
+    "BAYSHORE RD",
+    "MANY RD"
+   ],
+   "fromMp": 14.988,
+   "toMp": 15.986,
+   "crossStreets": [
+    "TAMIAMI TR N",
+    "WOODWARD AVE",
+    "MANY RD",
+    "PINEY RD",
+    "CRESCENT LAKE DR"
+   ],
+   "center": [
+    -79.48054,
+    25.89724
+   ],
+   "crashes": 34,
+   "base2011to2018": 26,
+   "check2019to2022": 8,
+   "pedestrian": 13,
+   "bicyclist": 21,
+   "fatal": 7,
+   "fatalOrSerious": 12,
+   "dark": 14,
+   "atIntersection": 26,
+   "sidewalkMiles": {
+    "both": 0.87,
+    "one": 0.13,
+    "none": 0
+   },
+   "rank": 8
+  },
+  {
+   "roadwayId": "12010000",
+   "names": [
+    "US 41",
+    "TAMIAMI TRL S",
+    "LAKESHORE DR"
+   ],
+   "fromMp": 0.13,
+   "toMp": 1.124,
+   "crossStreets": [
+    "SANIBEL BLVD",
+    "TAMIAMI TRL S",
+    "TAMIAMI TRL",
+    "BONITA BEACH RD SE",
+    "BONITA BEACH RD"
+   ],
+   "center": [
+    -81.80566,
+    26.32845
+   ],
+   "crashes": 34,
+   "base2011to2018": 25,
+   "check2019to2022": 9,
+   "pedestrian": 20,
+   "bicyclist": 14,
+   "fatal": 4,
+   "fatalOrSerious": 10,
+   "dark": 11,
+   "atIntersection": 25,
+   "sidewalkMiles": {
+    "both": 0.99,
+    "one": 0,
+    "none": 0
+   },
+   "rank": 9
+  },
+  {
+   "roadwayId": "12004000",
+   "names": [
+    "SAN CARLOS BLVD",
+    "SR 865",
+    "CR 869"
+   ],
+   "fromMp": 2.211,
+   "toMp": 3.141,
+   "crossStreets": [
+    "SUMMERLIN RD",
+    "CR 869",
+    "SAN CARLOS BLVD",
+    "BROADWAY AVE",
+    "SUMMERLIN SQUARE DR"
+   ],
+   "center": [
+    -81.94365,
+    26.49086
+   ],
+   "crashes": 26,
+   "base2011to2018": 15,
+   "check2019to2022": 11,
+   "pedestrian": 6,
+   "bicyclist": 20,
+   "fatal": 4,
+   "fatalOrSerious": 9,
+   "dark": 11,
+   "atIntersection": 13,
+   "sidewalkMiles": {
+    "both": 0.93,
+    "one": 0,
+    "none": 0
+   },
+   "rank": 10
+  },
+  {
+   "roadwayId": "12004000",
+   "names": [
+    "SAN CARLOS BLVD",
+    "SR 865"
+   ],
+   "fromMp": 0.001,
+   "toMp": 0.928,
+   "crossStreets": [
+    "MAIN ST",
+    "PRESCOTT ST",
+    "BUTTONWOOD DR",
+    "ESTERO BLVD",
+    "FIFTH AVE"
+   ],
+   "center": [
+    -81.95245,
+    26.46206
+   ],
+   "crashes": 23,
+   "base2011to2018": 20,
+   "check2019to2022": 3,
+   "pedestrian": 11,
+   "bicyclist": 12,
+   "fatal": 2,
+   "fatalOrSerious": 7,
+   "dark": 11,
+   "atIntersection": 13,
+   "sidewalkMiles": {
+    "both": 0.34,
+    "one": 0.59,
+    "none": 0
+   },
+   "rank": 11
+  },
+  {
+   "roadwayId": "12005000",
+   "names": [
+    "COLONIAL BLVD",
+    "SR 884",
+    "WINKLER AVE"
+   ],
+   "fromMp": 4.612,
+   "toMp": 5.476,
+   "crossStreets": [
+    "WINKLER AVE",
+    "SIX MILE CYPRESS PKWY",
+    "COLONIAL BLVD",
+    "SIX MILE CYPRESS PKWY R",
+    "ORTIZ AVE"
+   ],
+   "center": [
+    -81.81433,
+    26.61176
+   ],
+   "crashes": 23,
+   "base2011to2018": 19,
+   "check2019to2022": 4,
+   "pedestrian": 14,
+   "bicyclist": 9,
+   "fatal": 5,
+   "fatalOrSerious": 6,
+   "dark": 14,
+   "atIntersection": 16,
+   "sidewalkMiles": {
+    "both": 0,
+    "one": 0.86,
+    "none": 0
+   },
+   "rank": 12
+  },
+  {
+   "roadwayId": "12060000",
+   "names": [
+    "BAYSHORE RD",
+    "SR 78",
+    "HART RD"
+   ],
+   "fromMp": 16.031,
+   "toMp": 17.024,
+   "crossStreets": [
+    "BAYSHORE RD",
+    "EVALENA LN",
+    "SR 78",
+    "HART RD",
+    "MAGNOLIA DR"
+   ],
+   "center": [
+    -77.97226,
+    25.41472
+   ],
+   "crashes": 21,
+   "base2011to2018": 17,
+   "check2019to2022": 4,
+   "pedestrian": 12,
+   "bicyclist": 9,
+   "fatal": 6,
+   "fatalOrSerious": 10,
+   "dark": 13,
+   "atIntersection": 19,
+   "sidewalkMiles": {
+    "both": 0.99,
+    "one": 0,
+    "none": 0
+   },
+   "rank": 13
+  },
+  {
+   "roadwayId": "12001000",
+   "names": [
+    "TAMIAMI TRL N",
+    "SR 739",
+    "PONDELLA RD"
+   ],
+   "fromMp": 1.66,
+   "toMp": 2.594,
+   "crossStreets": [
+    "PONDELLA RD",
+    "BROOKS RD",
+    "MARIANA AVE E",
+    "SR 739",
+    "CRESCENT LAKE DR"
+   ],
+   "center": [
+    -81.88226,
+    26.6735
+   ],
+   "crashes": 21,
+   "base2011to2018": 16,
+   "check2019to2022": 5,
+   "pedestrian": 6,
+   "bicyclist": 15,
+   "fatal": 4,
+   "fatalOrSerious": 9,
+   "dark": 4,
+   "atIntersection": 17,
+   "sidewalkMiles": {
+    "both": 0.93,
+    "one": 0,
+    "none": 0
+   },
+   "rank": 14
+  },
+  {
+   "roadwayId": "12501000",
+   "names": [
+    "CR-867A",
+    "DEL PRADO BLVD",
+    "DEL PRADO BLVD S"
+   ],
+   "fromMp": 4.005,
+   "toMp": 5.004,
+   "crossStreets": [
+    "CORAL POINT DR",
+    "SE 17TH ST",
+    "SE 16TH TER",
+    "SE 15TH TER",
+    "SE 10TH TER"
+   ],
+   "center": [
+    -81.94079,
+    26.62605
+   ],
+   "crashes": 19,
+   "base2011to2018": 19,
+   "check2019to2022": 0,
+   "pedestrian": 7,
+   "bicyclist": 12,
+   "fatal": 2,
+   "fatalOrSerious": 5,
+   "dark": 2,
+   "atIntersection": 3,
+   "sidewalkMiles": null,
+   "rank": 15
+  },
+  {
+   "roadwayId": "12070000",
+   "names": [
+    "M L KING BLVD",
+    "SR 82",
+    "CRANFORD AVE"
+   ],
+   "fromMp": 0.081,
+   "toMp": 0.893,
+   "crossStreets": [
+    "SR 82",
+    "M L KING BLVD",
+    "JACKSON ST",
+    "CRANFORD AVE",
+    "FOWLER ST"
+   ],
+   "center": [
+    -81.86408,
+    26.64085
+   ],
+   "crashes": 19,
+   "base2011to2018": 16,
+   "check2019to2022": 3,
+   "pedestrian": 10,
+   "bicyclist": 9,
+   "fatal": 2,
+   "fatalOrSerious": 2,
+   "dark": 3,
+   "atIntersection": 15,
+   "sidewalkMiles": {
+    "both": 0.81,
+    "one": 0,
+    "none": 0
+   },
+   "rank": 16
+  },
+  {
+   "roadwayId": "12040000",
+   "names": [
+    "MCGREGOR BLVD",
+    "IONA RD",
+    "SR 867"
+   ],
+   "fromMp": 0,
+   "toMp": 0.635,
+   "crossStreets": [
+    "MCGREGOR BLVD",
+    "IONA RD",
+    "PAUL SHULTZ WAY",
+    "SR 865",
+    "PAUL SCHULTZ WAY"
+   ],
+   "center": [
+    -81.94093,
+    26.52031
+   ],
+   "crashes": 18,
+   "base2011to2018": 13,
+   "check2019to2022": 5,
+   "pedestrian": 2,
+   "bicyclist": 16,
+   "fatal": 1,
+   "fatalOrSerious": 8,
+   "dark": 3,
+   "atIntersection": 13,
+   "sidewalkMiles": {
+    "both": 0.64,
+    "one": 0,
+    "none": 0
+   },
+   "rank": 17
+  },
+  {
+   "roadwayId": "12070000",
+   "names": [
+    "SR 82",
+    "M L KING BLVD",
+    "DR MARTIN LUTHER KING B"
+   ],
+   "fromMp": 2.021,
+   "toMp": 2.891,
+   "crossStreets": [
+    "VERONICA SHOEMAKER BLVD",
+    "FLINT DR",
+    "M L KING BLVD",
+    "SR 82",
+    "SABAL PALMS BLVD"
+   ],
+   "center": [
+    -81.83298,
+    26.64118
+   ],
+   "crashes": 18,
+   "base2011to2018": 17,
+   "check2019to2022": 1,
+   "pedestrian": 7,
+   "bicyclist": 11,
+   "fatal": 1,
+   "fatalOrSerious": 2,
+   "dark": 4,
+   "atIntersection": 16,
+   "sidewalkMiles": {
+    "both": 0.87,
+    "one": 0,
+    "none": 0
+   },
+   "rank": 18
+  },
+  {
+   "roadwayId": "12014000",
+   "names": [
+    "FOWLER ST",
+    "FOWLER AVE",
+    "FOWLER"
+   ],
+   "fromMp": 2.24,
+   "toMp": 3.224,
+   "crossStreets": [
+    "HANSON ST",
+    "MARKET ST",
+    "MAPLE AVE",
+    "EDISON AVE",
+    "MORADO ST"
+   ],
+   "center": [
+    -81.86216,
+    26.62901
+   ],
+   "crashes": 17,
+   "base2011to2018": 15,
+   "check2019to2022": 2,
+   "pedestrian": 13,
+   "bicyclist": 4,
+   "fatal": 6,
+   "fatalOrSerious": 10,
+   "dark": 13,
+   "atIntersection": 10,
+   "sidewalkMiles": {
+    "both": 0,
+    "one": 0.01,
+    "none": 0.92
+   },
+   "rank": 19
+  },
+  {
+   "roadwayId": "12004000",
+   "names": [
+    "SAN CARLOS BLVD",
+    "SR 865",
+    "CR 865"
+   ],
+   "fromMp": 3.421,
+   "toMp": 4.382,
+   "crossStreets": [
+    "KELLY RD",
+    "BEACH WALK BLVD",
+    "DERWENT BLVD",
+    "CINNAMON COVE BLVD",
+    "HEIDI LEE LN"
+   ],
+   "center": [
+    -77.12338,
+    24.94798
+   ],
+   "crashes": 17,
+   "base2011to2018": 8,
+   "check2019to2022": 9,
+   "pedestrian": 11,
+   "bicyclist": 6,
+   "fatal": 3,
+   "fatalOrSerious": 8,
+   "dark": 6,
+   "atIntersection": 9,
+   "sidewalkMiles": {
+    "both": 0,
+    "one": 0.96,
+    "none": 0
+   },
+   "rank": 20
+  },
+  {
+   "roadwayId": "12512000",
+   "names": [
+    "OLD US-41 RD",
+    "OLD 41 RD",
+    "CR-887"
+   ],
+   "fromMp": 1.768,
+   "toMp": 2.757,
+   "crossStreets": [
+    "E TERRY ST",
+    "CHILDERS ST",
+    "WILSON ST",
+    "W TERRY ST",
+    "BONITA DR"
+   ],
+   "center": [
+    -81.77921,
+    26.34635
+   ],
+   "crashes": 17,
+   "base2011to2018": 17,
+   "check2019to2022": 0,
+   "pedestrian": 7,
+   "bicyclist": 10,
+   "fatal": 0,
+   "fatalOrSerious": 2,
+   "dark": 5,
+   "atIntersection": 3,
+   "sidewalkMiles": null,
+   "rank": 21
+  },
+  {
+   "roadwayId": "12000080",
+   "names": [
+    "CAPE CORAL PKWY E",
+    "E CAPE CORAL PKWY",
+    "CAPE CORAL PKY E"
+   ],
+   "fromMp": 2.027,
+   "toMp": 2.931,
+   "crossStreets": [
+    "PALM TREE BLVD",
+    "CORONADO PKWY",
+    "PALM TREE DR",
+    "TARPON CT",
+    "SE 1ST PL"
+   ],
+   "center": [
+    -81.96334,
+    26.56277
+   ],
+   "crashes": 16,
+   "base2011to2018": 16,
+   "check2019to2022": 0,
+   "pedestrian": 5,
+   "bicyclist": 11,
+   "fatal": 1,
+   "fatalOrSerious": 6,
+   "dark": 4,
+   "atIntersection": 11,
+   "sidewalkMiles": null,
+   "rank": 22
+  },
+  {
+   "roadwayId": "12005000",
+   "names": [
+    "COLONIAL BLVD",
+    "FOWLER ST"
+   ],
+   "fromMp": 0.767,
+   "toMp": 1.726,
+   "crossStreets": [
+    "CLEVELAND AVE",
+    "DELEON ST",
+    "FOWLER ST",
+    "ORANGEWOOD AVE",
+    "MEADE AVE"
+   ],
+   "center": [
+    -81.87161,
+    26.59695
+   ],
+   "crashes": 15,
+   "base2011to2018": 12,
+   "check2019to2022": 3,
+   "pedestrian": 11,
+   "bicyclist": 4,
+   "fatal": 2,
+   "fatalOrSerious": 4,
+   "dark": 5,
+   "atIntersection": 7,
+   "sidewalkMiles": {
+    "both": 0.4,
+    "one": 0,
+    "none": 0.16
+   },
+   "rank": 23
+  },
+  {
+   "roadwayId": "12501000",
+   "names": [
+    "DEL PRADO BLVD S",
+    "DEL PRADO BLVD",
+    "CR-867A"
+   ],
+   "fromMp": 5.018,
+   "toMp": 5.941,
+   "crossStreets": [
+    "SE 6TH ST",
+    "VISCAYA PKWY",
+    "VISCAYA PKY",
+    "SE 4TH ST",
+    "SE 1ST TER"
+   ],
+   "center": [
+    -81.94092,
+    26.64199
+   ],
+   "crashes": 15,
+   "base2011to2018": 15,
+   "check2019to2022": 0,
+   "pedestrian": 3,
+   "bicyclist": 12,
+   "fatal": 0,
+   "fatalOrSerious": 1,
+   "dark": 0,
+   "atIntersection": 5,
+   "sidewalkMiles": null,
+   "rank": 24
+  },
+  {
+   "roadwayId": "12000122",
+   "names": [
+    "CAPE CORAL PKWY E",
+    "CAPE CORAL PKY E",
+    "E CAPE CORAL PKWY"
+   ],
+   "fromMp": 0.007,
+   "toMp": 0.543,
+   "crossStreets": [
+    "CORONADO PKWY",
+    "CHESTER ST",
+    "VINCENNES BLVD",
+    "VINCENNES ST",
+    "SE 8TH CT"
+   ],
+   "center": [
+    -81.95407,
+    26.56266
+   ],
+   "crashes": 14,
+   "base2011to2018": 14,
+   "check2019to2022": 0,
+   "pedestrian": 9,
+   "bicyclist": 5,
+   "fatal": 1,
+   "fatalOrSerious": 3,
+   "dark": 7,
+   "atIntersection": 5,
+   "sidewalkMiles": null,
+   "rank": 25
+  },
+  {
+   "roadwayId": "12550000",
+   "names": [
+    "PERIWINKLE WAY"
+   ],
+   "fromMp": 1.987,
+   "toMp": 2.943,
+   "crossStreets": [
+    "CASA YBEL RD",
+    "DIXIE BEACH BLVD",
+    "MAIN ST",
+    "FARM TRL",
+    "VINCA WAY"
+   ],
+   "center": [
+    -82.05833,
+    26.44157
+   ],
+   "crashes": 14,
+   "base2011to2018": 12,
+   "check2019to2022": 2,
+   "pedestrian": 1,
+   "bicyclist": 13,
+   "fatal": 0,
+   "fatalOrSerious": 2,
+   "dark": 0,
+   "atIntersection": 3,
+   "sidewalkMiles": null,
+   "rank": 26
+  },
+  {
+   "roadwayId": "12A14559",
+   "names": [
+    "SE 47TH TER",
+    "47TH TER"
+   ],
+   "fromMp": 0.515,
+   "toMp": 1.371,
+   "crossStreets": [
+    "VINCENNES BLVD",
+    "DEL PRADO BLVD S",
+    "SE 8TH CT",
+    "SE 9TH PL",
+    "CORONADO PKWY"
+   ],
+   "center": [
+    -81.95068,
+    26.5637
+   ],
+   "crashes": 13,
+   "base2011to2018": 13,
+   "check2019to2022": 0,
+   "pedestrian": 9,
+   "bicyclist": 4,
+   "fatal": 0,
+   "fatalOrSerious": 5,
+   "dark": 4,
+   "atIntersection": 6,
+   "sidewalkMiles": null,
+   "rank": 27
+  },
+  {
+   "roadwayId": "12100000",
+   "names": [
+    "CYPRESS LAKE DR",
+    "CR-876"
+   ],
+   "fromMp": 0.842,
+   "toMp": 1.778,
+   "crossStreets": [
+    "WINKLER RD",
+    "PANTHER LN",
+    "OVERLOOK DR",
+    "SUMMERLIN RD",
+    "GREENGATE BLVD"
+   ],
+   "center": [
+    -81.8941,
+    26.54591
+   ],
+   "crashes": 13,
+   "base2011to2018": 13,
+   "check2019to2022": 0,
+   "pedestrian": 4,
+   "bicyclist": 9,
+   "fatal": 0,
+   "fatalOrSerious": 4,
+   "dark": 4,
+   "atIntersection": 5,
+   "sidewalkMiles": null,
+   "rank": 28
+  },
+  {
+   "roadwayId": "12060000",
+   "names": [
+    "SR 78",
+    "PINE ISLAND RD",
+    "15TH AVE NE"
+   ],
+   "fromMp": 11.423,
+   "toMp": 12.371,
+   "crossStreets": [
+    "DEL PRADO BLVD",
+    "PONDELLA RD",
+    "15TH AVE NE",
+    "10TH PL NE",
+    "SR 78"
+   ],
+   "center": [
+    -81.94159,
+    26.66735
+   ],
+   "crashes": 13,
+   "base2011to2018": 10,
+   "check2019to2022": 3,
+   "pedestrian": 5,
+   "bicyclist": 8,
+   "fatal": 1,
+   "fatalOrSerious": 4,
+   "dark": 4,
+   "atIntersection": 10,
+   "sidewalkMiles": {
+    "both": 0,
+    "one": 0.17,
+    "none": 0.78
+   },
+   "rank": 29
+  },
+  {
+   "roadwayId": "12530000",
+   "names": [
+    "ESTERO BLVD",
+    "CR-865"
+   ],
+   "fromMp": 4.857,
+   "toMp": 5.622,
+   "crossStreets": [
+    "LENELL RD",
+    "BAY BEACH LN",
+    "BUCCANEER DR",
+    "ISLAND PINES WAY"
+   ],
+   "center": [
+    -81.89985,
+    26.4131
+   ],
+   "crashes": 12,
+   "base2011to2018": 12,
+   "check2019to2022": 0,
+   "pedestrian": 9,
+   "bicyclist": 3,
+   "fatal": 2,
+   "fatalOrSerious": 6,
+   "dark": 2,
+   "atIntersection": 1,
+   "sidewalkMiles": null,
+   "rank": 30
+  },
+  {
+   "roadwayId": "12501000",
+   "names": [
+    "DEL PRADO BLVD",
+    "CR-867A",
+    "DEL PRADO BLVD S"
+   ],
+   "fromMp": 2.239,
+   "toMp": 3.216,
+   "crossStreets": [
+    "CORNWALLIS PKY",
+    "CORNWALLIS PKWY",
+    "SE 28TH TER",
+    "SHELBY PKWY",
+    "SE 27TH ST"
+   ],
+   "center": [
+    -81.94142,
+    26.60177
+   ],
+   "crashes": 12,
+   "base2011to2018": 12,
+   "check2019to2022": 0,
+   "pedestrian": 7,
+   "bicyclist": 5,
+   "fatal": 0,
+   "fatalOrSerious": 4,
+   "dark": 4,
+   "atIntersection": 4,
+   "sidewalkMiles": null,
+   "rank": 31
+  },
+  {
+   "roadwayId": "12020000",
+   "names": [
+    "SR 80",
+    "BALBOA AVE",
+    "PALM BEACH BLVD"
+   ],
+   "fromMp": 4.56,
+   "toMp": 5.297,
+   "crossStreets": [
+    "SR 80",
+    "PALM BEACH BLVD",
+    "BELLAIR RD",
+    "BALBOA AVE",
+    "MIRAMAR RD"
+   ],
+   "center": [
+    -81.80918,
+    26.67814
+   ],
+   "crashes": 12,
+   "base2011to2018": 10,
+   "check2019to2022": 2,
+   "pedestrian": 6,
+   "bicyclist": 6,
+   "fatal": 2,
+   "fatalOrSerious": 3,
+   "dark": 6,
+   "atIntersection": 10,
+   "sidewalkMiles": {
+    "both": 0.74,
+    "one": 0,
+    "none": 0
+   },
+   "rank": 32
+  },
+  {
+   "roadwayId": "12000027",
+   "names": [
+    "SANTA BARBARA BLVD"
+   ],
+   "fromMp": 1.283,
+   "toMp": 2.255,
+   "crossStreets": [
+    "SW 24TH ST",
+    "CR-884",
+    "SE 24TH ST",
+    "22ND TER",
+    "KAMAL PKY"
+   ],
+   "center": [
+    -81.97432,
+    26.60752
+   ],
+   "crashes": 12,
+   "base2011to2018": 12,
+   "check2019to2022": 0,
+   "pedestrian": 4,
+   "bicyclist": 8,
+   "fatal": 0,
+   "fatalOrSerious": 2,
+   "dark": 1,
+   "atIntersection": 4,
+   "sidewalkMiles": null,
+   "rank": 33
+  },
+  {
+   "roadwayId": "12000040",
+   "names": [
+    "HANSON ST",
+    "FOWLER ST"
+   ],
+   "fromMp": 0.51,
+   "toMp": 1.17,
+   "crossStreets": [
+    "CLEVELAND",
+    "ROYAL PALM AVE",
+    "HANSON ST",
+    "CALVIN BLVD",
+    "MONTCLAIR AVE"
+   ],
+   "center": [
+    -81.86525,
+    26.62258
+   ],
+   "crashes": 12,
+   "base2011to2018": 12,
+   "check2019to2022": 0,
+   "pedestrian": 6,
+   "bicyclist": 6,
+   "fatal": 0,
+   "fatalOrSerious": 2,
+   "dark": 6,
+   "atIntersection": 7,
+   "sidewalkMiles": null,
+   "rank": 34
+  },
+  {
+   "roadwayId": "12001000",
+   "names": [
+    "SR 739",
+    "HATTON ROGERS LN",
+    "BUCANEER MHP ENT"
+   ],
+   "fromMp": 2.894,
+   "toMp": 3.428,
+   "crossStreets": [
+    "POWELL DR",
+    "TAMIAMI TRL N",
+    "SR 739",
+    "HATTON ROGERS LN",
+    "BUCANEER MHP ENT"
+   ],
+   "center": [
+    -81.88564,
+    26.68755
+   ],
+   "crashes": 12,
+   "base2011to2018": 10,
+   "check2019to2022": 2,
+   "pedestrian": 4,
+   "bicyclist": 8,
+   "fatal": 0,
+   "fatalOrSerious": 1,
+   "dark": 1,
+   "atIntersection": 4,
+   "sidewalkMiles": {
+    "both": 0.53,
+    "one": 0,
+    "none": 0
+   },
+   "rank": 35
+  },
+  {
+   "roadwayId": "12000526",
+   "names": [
+    "N HOMESTEAD RD",
+    "HOMESTEAD RD N",
+    "HOMESTEAD RD"
+   ],
+   "fromMp": 0.011,
+   "toMp": 0.874,
+   "crossStreets": [
+    "PLAZA DR",
+    "TAYLOR LN EXT",
+    "ALABAMA RD",
+    "WESTMINSTER ST",
+    "N WESTMINSTER ST"
+   ],
+   "center": [
+    -81.64961,
+    26.60672
+   ],
+   "crashes": 11,
+   "base2011to2018": 11,
+   "check2019to2022": 0,
+   "pedestrian": 6,
+   "bicyclist": 5,
+   "fatal": 2,
+   "fatalOrSerious": 6,
+   "dark": 5,
+   "atIntersection": 2,
+   "sidewalkMiles": null,
+   "rank": 36
+  },
+  {
+   "roadwayId": "12060000",
+   "names": [
+    "SR 78",
+    "NICHOLAS PKWY"
+   ],
+   "fromMp": 8.89,
+   "toMp": 9.857,
+   "crossStreets": [
+    "SANTA BARBARA BLVD",
+    "NICHOLAS PKWY",
+    "SR 78",
+    "HANCOCK BRIDGE PKWY"
+   ],
+   "center": [
+    -74.52617,
+    24.22733
+   ],
+   "crashes": 11,
+   "base2011to2018": 7,
+   "check2019to2022": 4,
+   "pedestrian": 5,
+   "bicyclist": 6,
+   "fatal": 1,
+   "fatalOrSerious": 4,
+   "dark": 5,
+   "atIntersection": 7,
+   "sidewalkMiles": {
+    "both": 0,
+    "one": 0.23,
+    "none": 0.74
+   },
+   "rank": 37
+  },
+  {
+   "roadwayId": "12005000",
+   "names": [
+    "LEE BLVD"
+   ],
+   "fromMp": 14.632,
+   "toMp": 15.343,
+   "crossStreets": [
+    "BELLA CT",
+    "HAZELWOOD AVE S",
+    "HOMESTEAD RD N",
+    "1ST ST W"
+   ],
+   "center": [
+    -81.66076,
+    26.61482
+   ],
+   "crashes": 11,
+   "base2011to2018": 11,
+   "check2019to2022": 0,
+   "pedestrian": 4,
+   "bicyclist": 7,
+   "fatal": 0,
+   "fatalOrSerious": 1,
+   "dark": 1,
+   "atIntersection": 4,
+   "sidewalkMiles": null,
+   "rank": 38
+  },
+  {
+   "roadwayId": "12580000",
+   "names": [
+    "PONDELLA RD",
+    "PONDELLA"
+   ],
+   "fromMp": 0.456,
+   "toMp": 1.432,
+   "crossStreets": [
+    "ORANGE GROVE BLVD",
+    "E INDUSTRIAL RD",
+    "HIBISCUS DR",
+    "S HANCOCK CREEK BLVD",
+    "WILLOW BRIDGE"
+   ],
+   "center": [
+    -81.92112,
+    26.6674
+   ],
+   "crashes": 10,
+   "base2011to2018": 10,
+   "check2019to2022": 0,
+   "pedestrian": 3,
+   "bicyclist": 7,
+   "fatal": 2,
+   "fatalOrSerious": 4,
+   "dark": 6,
+   "atIntersection": 3,
+   "sidewalkMiles": null,
+   "rank": 39
+  },
+  {
+   "roadwayId": "12014000",
+   "names": [
+    "FOWLER ST",
+    "FOWLER AVE"
+   ],
+   "fromMp": 1.008,
+   "toMp": 1.795,
+   "crossStreets": [
+    "WINKLER AVE",
+    "CARRELL RD",
+    "SIMPSON ST",
+    "WELCH ST",
+    "HUNTER ST"
+   ],
+   "center": [
+    -81.86184,
+    26.61062
+   ],
+   "crashes": 10,
+   "base2011to2018": 10,
+   "check2019to2022": 0,
+   "pedestrian": 7,
+   "bicyclist": 3,
+   "fatal": 2,
+   "fatalOrSerious": 4,
+   "dark": 4,
+   "atIntersection": 4,
+   "sidewalkMiles": null,
+   "rank": 40
+  },
+  {
+   "roadwayId": "12040000",
+   "names": [
+    "MCGREGOR BLVD",
+    "SR 867",
+    "OLD WHISKEY CREEK DR"
+   ],
+   "fromMp": 4.846,
+   "toMp": 5.792,
+   "crossStreets": [
+    "ROBALO DR",
+    "MCGREGOR BLVD",
+    "RAILS END CT",
+    "WINKLER RD",
+    "LONGWOOD DR"
+   ],
+   "center": [
+    -81.89709,
+    26.57984
+   ],
+   "crashes": 10,
+   "base2011to2018": 7,
+   "check2019to2022": 3,
+   "pedestrian": 5,
+   "bicyclist": 5,
+   "fatal": 1,
+   "fatalOrSerious": 3,
+   "dark": 3,
+   "atIntersection": 7,
+   "sidewalkMiles": {
+    "both": 0.3,
+    "one": 0.64,
+    "none": 0
+   },
+   "rank": 41
+  },
+  {
+   "roadwayId": "12011000",
+   "names": [
+    "METRO PKWY",
+    "WINKLER AVE"
+   ],
+   "fromMp": 7.72,
+   "toMp": 8.566,
+   "crossStreets": [
+    "COLONIAL BLVD/SR884",
+    "WINKLER AVE",
+    "WESTWOOD ENT",
+    "METRO PKWY"
+   ],
+   "center": [
+    -81.85055,
+    26.60263
+   ],
+   "crashes": 10,
+   "base2011to2018": 8,
+   "check2019to2022": 2,
+   "pedestrian": 9,
+   "bicyclist": 1,
+   "fatal": 0,
+   "fatalOrSerious": 3,
+   "dark": 5,
+   "atIntersection": 7,
+   "sidewalkMiles": {
+    "both": 0.5,
+    "one": 0.06,
+    "none": 0.03
+   },
+   "rank": 42
+  }
+ ]
+}
