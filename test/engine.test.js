@@ -147,9 +147,22 @@ test("slip-lane corners add a penalty to crosswalks that start or end there", ()
   assert.equal(crossings(slipped.typical)[0].cost, crossings(plain.typical)[0].cost);
 });
 
-test("corridor data: OSM crosswalks on every leg, Daniels slip lanes imply heavy northbound rights", () => {
-  for (const I of SAMPLE_DATA.intersections) for (const l of I.legs) assert.equal(I.crosswalks[l], true, `${I.id} ${l}`);
-  const d = SAMPLE_DATA.intersections.find((I) => I.id === "daniels");
+test("corridor data: crosswalks from OSM, unmapped legs flagged, Daniels slip lanes imply heavy northbound rights", () => {
+  const byId = Object.fromEntries(SAMPLE_DATA.intersections.map((I) => [I.id, I]));
+  for (const I of SAMPLE_DATA.intersections) {
+    for (const l of I.legs) assert.equal(typeof I.crosswalks[l], "boolean", `${I.id} ${l}`);
+    for (const l of I.unverifiedCrosswalks) assert.ok(I.legs.includes(l) && I.crosswalks[l], `${I.id} ${l}: unverified legs are assumed present`);
+  }
+  // The original south-end intersections are fully mapped; downtown has gaps in OSM.
+  for (const id of ["sevenlakes", "cypresstrace", "daniels", "cypressterrace", "lakeridge", "sixmile", "jamaicabay"]) {
+    assert.deepEqual(byId[id].unverifiedCrosswalks, [], id);
+  }
+  assert.ok(SAMPLE_DATA.intersections.some((I) => I.unverifiedCrosswalks.length), "some downtown legs unmapped");
+  // North to south, ending at the old corridor's intersections.
+  const pos = SAMPLE_DATA.intersections.map((I) => I.pos);
+  assert.deepEqual(pos, [...pos].sort((a, b) => a - b));
+  assert.equal(SAMPLE_DATA.intersections[0].id, "mlk");
+  const d = byId.daniels;
   assert.deepEqual(d.slipCorners, ["NE", "SE", "SW"]);
   assert.deepEqual(d.heavyRight, ["S"]);
   assert.ok(SAMPLE_DATA.intersections.every((I) => I.ntor.length === 0 && I.lpi === false), "unverified: none assumed");

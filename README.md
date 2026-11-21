@@ -4,7 +4,7 @@ Sightline plans walks and bike rides to work along a busy corridor. It tells the
 
 - **Live site (GitHub Pages, real map):** https://therealdanielmiller.github.io/006---Sightline/
 - **Claude-hosted demo (diagram only, with Ask Claude):** https://claude.ai/artifact/2hRfy4aRJthRczTxsiRPYN. It's private until you share it from that page.
-- **Current state:** a working prototype for US 41 in south Fort Myers, from College Pkwy to Jamaica Bay Blvd. The road geometry, signal locations, crosswalks, free right-turn slip lanes, sidewalks, and bike lanes come from OpenStreetMap. No Turn on Red signs and leading pedestrian intervals aren't verified yet, so none are assumed. Construction events and places are illustrative, not real conditions.
+- **Current state:** a working prototype for 8.5 miles of US 41 in Fort Myers, from McGregor / MLK Blvd downtown to Jamaica Bay Blvd. That stretch takes in the three one-mile sections of US 41 with the most pedestrian and bicyclist crashes in Lee County, 2011–2022 (`data/lee-crash-sections.json`). The road geometry, signal locations, crosswalks, free right-turn slip lanes, sidewalks, and bike lanes come from OpenStreetMap. No Turn on Red signs and leading pedestrian intervals aren't verified yet, so none are assumed. Construction events and places are illustrative, not real conditions.
 
 ---
 
@@ -57,7 +57,8 @@ Sightline plans walks and bike rides to work along a busy corridor. It tells the
 | `src/engine.js` | Routing rules and scoring for walk and bike modes (the core logic) | **Yes**, to change safety rules or weights |
 | `src/data.js` | Corridor data: OSM data from `corridor-osm.js`, field-checked overrides (`FIELD_CHECKED`), and the illustrative events and places | **Yes**, to add field-checked rules, events, and places |
 | `src/corridor-osm.js` | **Generated** by `npm run fetch:osm`: centerline, intersections, sidewalks, bike lanes | **No**. Edit the CONFIG in the script and re-run it |
-| `scripts/fetch-osm-corridor.mjs` | Builds `corridor-osm.js` from OpenStreetMap | Yes, the CONFIG block |
+| `scripts/rank-crash-sections.mjs` | Ranks one-mile Lee County road sections by pedestrian/bicyclist crashes into `data/lee-crash-sections.json` | When new crash data arrives |
+| `scripts/fetch-osm-corridor.mjs` | Builds `corridor-osm.js` from OpenStreetMap | Yes, the CONFIG and OVERRIDES blocks |
 | `test/*.test.js` | Automated tests for routing, geometry, and map data (`npm test`) | Add cases when you change rules |
 | `scripts/demo-routes.js` | Prints routes for sample trips (`npm run demo`) | Add trips as needed |
 | `vite.config.js` | Build settings for the Pages site and the single-file artifact | Rarely |
@@ -148,9 +149,9 @@ The same format is used by `src/data.js` and by `corridor.json` from the live sc
 }
 ```
 
-**Where the data comes from.** `npm run fetch:osm` pulls the US 41 centerline, the seven signalized intersections (with their side-street legs, crosswalks, and slip lanes), sidewalk coverage, and bike lanes from OpenStreetMap into `src/corridor-osm.js`. OSM is community-mapped, so spot-check it against aerials. The intersection list itself is in the script's CONFIG.
+**Where the data comes from.** `npm run fetch:osm` pulls the US 41 centerline, the signalized intersections (31 on this stretch, with their side-street legs, lane counts, crosswalks, and slip lanes), sidewalk coverage, and bike lanes from OpenStreetMap into `src/corridor-osm.js`. Intersections are found automatically from OSM traffic-signal nodes and the roads that join there; `OVERRIDES` in the script pins stable ids and short labels. OSM is community-mapped, so spot-check it against aerials.
 
-**Crossings.** The fetch script also reads OSM crossings: a leg has a crosswalk when OSM maps a marked crossing on it, and a corner has a slip lane when OSM maps an unsignalized crossing out on that corner (currently NE, SE, and SW at Daniels / Cypress Lake). Heavy right turns are inferred from slip lanes. Every leg on this stretch has a mapped crosswalk.
+**Crossings.** The fetch script also reads OSM crossings: a leg has a crosswalk when OSM maps a marked crossing on it, and a corner has a slip lane when OSM maps an unsignalized crossing out on that corner (currently NE, SE, and SW at Daniels / Cypress Lake). Heavy right turns are inferred from slip lanes. A leg with an explicitly unmarked crossing has no crosswalk. A leg with **nothing** mapped (common downtown, north of Colonial Blvd) is assumed to have one and listed in `unverifiedCrosswalks`; the step text tells the walker to look for it. Field-checking those legs and adding them to `FIELD_CHECKED` (or to OSM) clears the flag.
 
 **First task:** in `src/data.js`, fill in `FIELD_CHECKED` from a field visit or FDOT: No Turn on Red signs, leading pedestrian intervals, heavy right turns without slip lanes, and any crosswalk OSM gets wrong. Then replace the sample events and places. You know this corridor, and anyone from FDOT District 1 who sees the demo will too. `fetch_live.py` doesn't fill in `bikeFacilities` yet, so a corridor file it writes treats the whole road as having no bike facility.
 
@@ -195,7 +196,7 @@ The same format is used by `src/data.js` and by `corridor.json` from the live sc
 3. **Live-data server.** A small Node server with Neon (Postgres) that merges FDOT construction, FL511, and community reports into the `events` format.
 4. **Real origin/destination entry.** Address search with an open-source geocoder (Photon or Pelias) instead of the place list.
 5. **Signal data.** Add pedestrian signal timing and leading-interval data from the county or FDOT signal inventory.
-6. **Crash validation.** Check the rules against Signal Four Analytics pedestrian crash data. A short write-up of that would be strong interview material.
+6. **Crash validation.** `data/lee-crash-sections.json` ranks Lee County sections from FDOT State Safety Office data (2011–2022; thin after 2018). Next: Signal Four Analytics for 2023+, and checking the rules against where crashes actually happen. A short write-up of that would be strong interview material.
 7. **Rider angle for Lime.** Bike mode is in place; scooters could reuse it with their own weights in `WEIGHTS` (and add where they park at the end of a trip).
 
 ---

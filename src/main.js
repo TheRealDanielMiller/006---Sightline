@@ -8,6 +8,14 @@ const WORD = { E: "east", W: "west", N: "north", S: "south" };
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const short = (I) => I.short || I.name;
+// The street actually crossed on one side, e.g. a driveway opposite a named street.
+const legLabel = (I, side, full = false) => {
+  const n = (I.legNames || {})[side];
+  if (!n) return full ? I.name : short(I);
+  if (n === "ramps") return `the ${short(I)} ramps`;
+  if (n === "driveway" || n === "unnamed road") return `the ${n === "driveway" ? "driveway" : "side road"} opposite ${short(I)}`;
+  return n;
+};
 const US = () => DATA.corridor.short || "the main road";
 let last = null;
 const selectedMode = () => (document.querySelector('input[name="mode"]:checked') || {}).value || "walk";
@@ -17,8 +25,10 @@ const minutesFor = (meters, mode) => Math.max(1, Math.round(meters / SPEED_M_PER
 function fillPlaces() {
   const opts = DATA.places.map((p) => `<option value="${esc(p.id)}">${esc(p.name)} (${WORD[p.side]} side)</option>`).join("");
   $("orig").innerHTML = opts; $("dest").innerHTML = opts;
-  $("orig").value = DATA.places[0].id;
-  $("dest").value = DATA.places[DATA.places.length - 1].id;
+  const [o, d] = DATA.defaultTrip || [];
+  const has = (id) => DATA.places.some((p) => p.id === id);
+  $("orig").value = has(o) ? o : DATA.places[0].id;
+  $("dest").value = has(d) ? d : DATA.places[DATA.places.length - 1].id;
   $("corridorSub").textContent = (DATA.sample ? "Demo corridor: " : "Corridor: ") + DATA.corridor.name + ", " + DATA.corridor.city + ".";
   $("dataPill").textContent = (DATA.sample ? "Sample data · " : "Loaded data · ") + DATA.corridor.short + ", " + DATA.corridor.city.split(",")[0];
 }
@@ -78,8 +88,8 @@ function describe(r) {
       const flags = [];
       let cls = "go";
       if (a.noCrosswalk) { cls = "stop"; flags.push({ cls: "stop", text: "There is no marked crosswalk on this side. Cross only with the signal and extra care." }); }
-      if (a.ntor) flags.push({ cls: "go", text: `"No Turn on Red" is posted for drivers on ${short(a.I)} here, so no right-on-red conflict.` });
-      else if (a.visible) flags.push({ cls: "go", text: `Drivers turning right on red from ${short(a.I)} look left for traffic, which is toward you.` });
+      if (a.ntor) flags.push({ cls: "go", text: `"No Turn on Red" is posted for drivers on ${legLabel(a.I, a.side)} here, so no right-on-red conflict.` });
+      else if (a.visible) flags.push({ cls: "go", text: `Drivers turning right on red from ${legLabel(a.I, a.side)} look left for traffic, which is toward you.` });
       else { cls = cls === "stop" ? cls : "warn"; flags.push({ cls: "warn", text: `Drivers turning right on red here look away from you. Wait until they have fully stopped and you've made eye contact.${a.I.lpi ? " A leading pedestrian interval gives you a head start." : ""}` }); }
       if (a.rightHook === "behind") {
         if (bike) { cls = cls === "stop" ? cls : "warn"; flags.push({ cls: "warn", text: `Right-hook risk: heavy right turns from ${US()} on green cut across your path from behind. Watch for turn signals and never pass a turning car on its right.` }); }
@@ -88,7 +98,8 @@ function describe(r) {
       if (a.rightHook === "toward") flags.push({ cls: "go", text: `Right-turning drivers from ${US()} will be coming toward you, so you can see each other.` });
       if (a.corner && a.corner.length) flags.push({ cls: "warn", text: `Corner work zone: ${a.corner[0].desc}. Follow the posted detour.` });
       if (a.slip && a.slip.length) { cls = cls === "stop" ? cls : "warn"; flags.push(slipFlag(a)); }
-      const title = a.inRoad ? `Ride through ${a.I.name} in the bike lane on the ${WORD[a.side]} side` : `Cross ${a.I.name} on the ${WORD[a.side]} side of ${US()}`;
+      if (!a.inRoad && unverified(a.I, a.side)) flags.push(UNVERIFIED_FLAG);
+      const title = a.inRoad ? `Ride through ${a.I.name} in the bike lane on the ${WORD[a.side]} side` : `Cross ${legLabel(a.I, a.side, true)} on the ${WORD[a.side]} side of ${US()}`;
       steps.push({ badge: String(n), cls, title, why: crossingWhy(a, r), flags, act: a });
     } else if (a.type === "crossCorridor") {
       n++; a.n = n;
@@ -101,6 +112,7 @@ function describe(r) {
       else flags.push({ cls: "warn", text: `${cap(approachDir)} drivers turning right on red look away from you on this crosswalk.${a.I.crosswalks[otherLeg] ? "" : ` The ${WORD[otherLeg]} crosswalk, where they'd see you, is missing here.`} Wait for a full stop and eye contact.` });
       if (a.corner && a.corner.length) flags.push({ cls: "warn", text: `Corner work zone: ${a.corner[0].desc}. Follow the posted detour.` });
       if (a.slip && a.slip.length) flags.push(slipFlag(a));
+      if (unverified(a.I, a.leg)) flags.push(UNVERIFIED_FLAG);
       if (bike) flags.push({ cls: "go", text: `Walk your bike across in the crosswalk, or use a two-stage turn box if one is marked.` });
       steps.push({ badge: String(n), cls, title: `Cross ${US()} to the ${WORD[a.to]} side on the ${WORD[a.leg]} crosswalk at ${a.I.name}`, why: corridorWhy(a, r), flags, act: a });
     }
@@ -108,6 +120,10 @@ function describe(r) {
   steps.push({ badge: "B", cls: "end", title: `Arrive at ${r.dest.name}`, why: `On the ${WORD[r.dest.side]} side.` });
   return steps;
 }
+
+// Legs where the map data has no crossing drawn: we assume a crosswalk but say so.
+const unverified = (I, leg) => (I.unverifiedCrosswalks || []).includes(leg);
+const UNVERIFIED_FLAG = { cls: "warn", text: "This crosswalk isn't in our map data yet. Look for the marked crosswalk and push button; if there isn't one, cross only on the walk signal." };
 
 const CORNER_WORD = { NE: "northeast", NW: "northwest", SE: "southeast", SW: "southwest" };
 function slipFlag(a) {
@@ -117,7 +133,7 @@ function slipFlag(a) {
 }
 
 function crossingWhy(a, r) {
-  return `You're ${r.mode === "bike" ? "riding" : "walking"} ${WORD[r.travel]}bound, crossing ${short(a.I)} (${a.I.crossLanes} lanes).`;
+  return `You're ${r.mode === "bike" ? "riding" : "walking"} ${WORD[r.travel]}bound, crossing ${legLabel(a.I, a.side)} (${a.I.crossLanes} lanes).`;
 }
 function corridorWhy(a, r) {
   if (r.detour) return `Your destination is across ${US()} on the same block, so we send you to the nearest signal instead of having you cross mid-block.`;
@@ -148,8 +164,15 @@ function corridorWhy(a, r) {
 
 // ---------- map ----------
 function drawMap(r) {
-  const L = DATA.corridor.length, W = 380, top = 34, H = 780, sc = (H - top - 30) / L;
-  const y = (p) => top + p * sc;
+  // Show only the stretch this trip uses (plus a margin), so a long corridor stays legible.
+  const L = DATA.corridor.length, W = 380, top = 34, H = 780;
+  const ends = [r.orig.pos, r.dest.pos, ...r.acts.flatMap((a) => (a.I ? [a.I.pos] : []))];
+  let lo = Math.max(0, Math.min(...ends) - 150), hi = Math.min(L, Math.max(...ends) + 150);
+  const MIN_SPAN = 900;
+  if (hi - lo < MIN_SPAN) { const grow = (MIN_SPAN - (hi - lo)) / 2; lo = Math.max(0, lo - grow); hi = Math.min(L, hi + grow); }
+  const sc = (H - top - 30) / (hi - lo);
+  const y = (p) => top + (Math.max(lo, Math.min(hi, p)) - lo) * sc;
+  const inView = (from, to) => to >= lo && from <= hi;
   const X = { W: 146, E: 234 }, PX = { W: 122, E: 258 };
   const band = (I) => 10 + I.crossLanes * 2.4;
   const legY = (I, leg) => y(I.pos) + (leg === "N" ? -1 : 1) * (band(I) / 2 + 8);
@@ -158,13 +181,19 @@ function drawMap(r) {
   s += `<rect x="160" y="${top - 14}" width="60" height="${H - top}" fill="#5b6672"/>`;
   s += `<line x1="190" y1="${top - 14}" x2="190" y2="${H}" stroke="#ffd96a" stroke-width="1.5" stroke-dasharray="9 8"/>`;
   // cross streets
+  const lastLabel = { start: -99, end: -99 };
   for (const I of DATA.intersections) {
+    if (!inView(I.pos - 40, I.pos + 40)) continue;
     const b = band(I), yc = y(I.pos);
     if (I.legs.includes("W")) s += `<rect x="0" y="${yc - b / 2}" width="160" height="${b}" fill="#6b7682"/>`;
     if (I.legs.includes("E")) s += `<rect x="220" y="${yc - b / 2}" width="160" height="${b}" fill="#6b7682"/>`;
     s += `<rect x="160" y="${yc - b / 2}" width="60" height="${b}" fill="#5b6672"/>`;
     const lx = I.legs.includes("E") ? 374 : 6, anchor = I.legs.includes("E") ? "end" : "start";
-    s += `<text x="${lx}" y="${yc - b / 2 - 5}" font-size="11.5" font-weight="700" fill="#13263a" text-anchor="${anchor}">${esc(short(I))}</text>`;
+    // Skip a label that would overlap the one above it on the same side.
+    if (yc - lastLabel[anchor] > 16) {
+      s += `<text x="${lx}" y="${yc - b / 2 - 5}" font-size="11.5" font-weight="700" fill="#13263a" text-anchor="${anchor}">${esc(short(I))}</text>`;
+      lastLabel[anchor] = yc;
+    }
     // crosswalks
     for (const leg of ["N", "S"]) {
       if (!I.crosswalks[leg]) { s += `<text x="190" y="${legY(I, leg) + 4}" font-size="11" fill="#ffb4ad" text-anchor="middle" font-weight="800">✕ no crosswalk</text>`; continue; }
@@ -178,11 +207,11 @@ function drawMap(r) {
   }
   // sidewalks + gaps
   for (const side of ["E", "W"]) {
-    for (const sw of DATA.sidewalks[side] || []) s += `<line x1="${X[side]}" y1="${y(sw.from)}" x2="${X[side]}" y2="${y(sw.to)}" stroke="#b9c2cc" stroke-width="4"/>`;
-    for (const g of gapsFor(DATA, side)) s += `<line x1="${X[side]}" y1="${y(g.from)}" x2="${X[side]}" y2="${y(g.to)}" stroke="#c8362f" stroke-width="3" stroke-dasharray="5 4"/>`;
+    for (const sw of (DATA.sidewalks[side] || []).filter((x) => inView(x.from, x.to))) s += `<line x1="${X[side]}" y1="${y(sw.from)}" x2="${X[side]}" y2="${y(sw.to)}" stroke="#b9c2cc" stroke-width="4"/>`;
+    for (const g of gapsFor(DATA, side).filter((x) => inView(x.from, x.to))) s += `<line x1="${X[side]}" y1="${y(g.from)}" x2="${X[side]}" y2="${y(g.to)}" stroke="#c8362f" stroke-width="3" stroke-dasharray="5 4"/>`;
     if (r.mode === "bike") {
       // on-road lanes at the curb; paths beside the sidewalk
-      for (const f of (DATA.bikeFacilities || {})[side] || []) {
+      for (const f of ((DATA.bikeFacilities || {})[side] || []).filter((x) => inView(x.from, x.to))) {
         const fx = f.type === "path" ? X[side] + (side === "E" ? 8 : -8) : side === "E" ? 216 : 164;
         s += `<line x1="${fx}" y1="${y(f.from)}" x2="${fx}" y2="${y(f.to)}" stroke="#1f8a5b" stroke-width="3"${f.type === "lane" ? ' stroke-dasharray="10 3"' : ""}/>`;
       }
@@ -191,6 +220,7 @@ function drawMap(r) {
   // events
   const activeIds = new Set(r.activeEvents.map((e) => e.id));
   for (const e of DATA.events) {
+    if (!inView(e.from, e.to)) continue;
     const on = activeIds.has(e.id);
     const sides = e.side === "both" ? ["E", "W"] : [e.side];
     for (const side of sides) {
@@ -226,7 +256,8 @@ function drawMap(r) {
     s += `<line x1="${X[p.side]}" y1="${py}" x2="${px}" y2="${py}" stroke="#13263a" stroke-width="2"/>`;
     s += `<circle cx="${px}" cy="${py}" r="11" fill="#13263a"/><text x="${px}" y="${py + 4}" font-size="12" font-weight="800" fill="#fff" text-anchor="middle">${lbl}</text>`;
   }
-  s += `<text x="190" y="${top - 18}" font-size="12" font-weight="800" fill="#13263a" text-anchor="middle">${esc(DATA.corridor.short)} · N ↑</text>`;
+  s += `<text x="190" y="${top - 18}" font-size="12" font-weight="800" fill="#13263a" text-anchor="middle">${esc(DATA.corridor.short)} · N ↑${lo > 0 ? " (continues)" : ""}</text>`;
+  if (hi < L) s += `<text x="190" y="${H - 22}" font-size="10.5" fill="#fff" text-anchor="middle">continues ↓</text>`;
   s += `<text x="${X.W}" y="${H - 8}" font-size="10.5" fill="#44566a" text-anchor="middle">west side</text><text x="${X.E}" y="${H - 8}" font-size="10.5" fill="#44566a" text-anchor="middle">east side</text>`;
   s += `</svg>`;
   $("map").innerHTML = s;

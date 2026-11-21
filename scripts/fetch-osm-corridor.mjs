@@ -5,9 +5,11 @@
 //
 // Usage: npm run fetch:osm
 //
-// Intersections are listed by hand below (from OSM traffic-signal nodes). No Turn on Red
-// signs and leading pedestrian intervals are NOT in OSM here; those stay in src/data.js
-// until field-verified.
+// Signalized intersections are found automatically: traffic-signal nodes on the corridor's
+// carriageways, grouped, with their side streets (which side they leave on, name, lane
+// count) taken from the roads that join there. OVERRIDES below pin stable ids and short
+// labels for intersections we refer to elsewhere. No Turn on Red signs and leading
+// pedestrian intervals are NOT in OSM here; those stay in src/data.js until field-verified.
 //
 // OSM data © OpenStreetMap contributors, ODbL 1.0.
 import { writeFileSync } from "node:fs";
@@ -15,21 +17,39 @@ import { makeFrame } from "../src/geo.js";
 
 const CONFIG = {
   ref: "US 41",
-  north: 26.5545, // corridor north end (latitude): just south of College Pkwy
+  north: 26.6416, // corridor north end (latitude): just north of Dr. Martin Luther King Jr. Blvd (SR 82)
   south: 26.5195, // corridor south end: just south of Jamaica Bay Blvd
-  bbox: [26.515, -81.880, 26.559, -81.862], // south, west, north, east
+  bbox: [26.515, -81.885, 26.646, -81.860], // south, west, north, east
   maxOffsetM: 45, // how far from the centerline a sidewalk or path can be and still count
   mergeGapM: 35, // join sidewalk pieces split by driveways or side-street crossings
-  intersections: [
-    { id: "sevenlakes", name: "Seven Lakes Blvd / Big Pine Way", short: "Seven Lakes", lat: 26.5519, lon: -81.87167, legs: ["N", "S", "E", "W"], crossLanes: 2 },
-    { id: "cypresstrace", name: "Cypress Trace Dr", lat: 26.55011, lon: -81.87159, legs: ["N", "S", "W"], crossLanes: 2 },
-    { id: "daniels", name: "Daniels Pkwy / Cypress Lake Dr", short: "Daniels / Cypress Lake", lat: 26.54629, lon: -81.87154, legs: ["N", "S", "E", "W"], crossLanes: 6 },
-    { id: "cypressterrace", name: "Cypress Terrace", lat: 26.54209, lon: -81.87146, legs: ["N", "S", "W"], crossLanes: 2 },
-    { id: "lakeridge", name: "Lakeridge Ct / Andrea Ln", short: "Lakeridge", lat: 26.53437, lon: -81.87134, legs: ["N", "S", "E", "W"], crossLanes: 2 },
-    { id: "sixmile", name: "Six Mile Cypress Pkwy / Gladiolus Dr", short: "Six Mile Cypress", lat: 26.52786, lon: -81.87127, legs: ["N", "S", "E", "W"], crossLanes: 6 },
-    { id: "jamaicabay", name: "Jamaica Bay Blvd", lat: 26.5221, lon: -81.86972, legs: ["N", "S", "E"], crossLanes: 2 },
-  ],
+  signalGroupM: 60, // signal nodes closer than this along the road are one intersection
+  sideRoadMinM: 22, // a side street must reach this far from the centerline to count as a leg
 };
+
+// Stable ids and labels for detected intersections, matched by name (or, where OSM gives
+// no usable name, by latitude within 60 m).
+const OVERRIDES = [
+  { match: /Martin Luther King/, id: "mlk", name: "McGregor Blvd / Dr. Martin Luther King Jr. Blvd (SR 82)", short: "McGregor / MLK" },
+  { lat: 26.5969, id: "colonial", name: "Colonial Blvd (interchange ramps)", short: "Colonial Blvd" },
+  { match: /Seven Lakes/, id: "sevenlakes", name: "Seven Lakes Blvd / Big Pine Way", short: "Seven Lakes" },
+  { match: /^Cypress Trace/, id: "cypresstrace" },
+  { match: /Daniels/, id: "daniels", name: "Daniels Pkwy / Cypress Lake Dr", short: "Daniels / Cypress Lake" },
+  { match: /^Cypress Terrace/, id: "cypressterrace" },
+  { match: /Lakeridge/, id: "lakeridge", name: "Lakeridge Ct / Andrea Ln", short: "Lakeridge" },
+  { match: /Six Mile/, id: "sixmile", name: "Six Mile Cypress Pkwy / Gladiolus Dr", short: "Six Mile Cypress" },
+  { match: /Jamaica Bay/, id: "jamaicabay" },
+];
+// Roads that can be a side-street leg. Ramps count only at single-point interchanges, where
+// people on foot cross them at the signal (e.g. Colonial Blvd over US 41).
+const isSideRoad = (t) => /^(primary|secondary|tertiary|unclassified|residential|service|living_street)$/.test(t.highway || "")
+  || (/_link$/.test(t.highway || "") && t.junction === "spui");
+const RANK = { primary: 6, secondary: 5, tertiary: 4, unclassified: 3, residential: 2, living_street: 1, service: 0 };
+// Shorter labels: "North Airport Road" -> "N Airport Rd". A direction word is abbreviated only
+// when a name follows it, so "South Street" stays "South St".
+const ABBR = { Street: "St", Avenue: "Ave", Boulevard: "Blvd", Drive: "Dr", Road: "Rd", Parkway: "Pkwy", Court: "Ct", Lane: "Ln", Terrace: "Ter" };
+const abbreviate = (s) => s
+  .replace(/\b(North|South|East|West) (?=\S+ \S)/g, (w) => w[0] + " ")
+  .replace(/\b[A-Z][a-z]+\b/g, (w) => ABBR[w] || w);
 
 const OVERPASS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter"];
 
@@ -68,39 +88,135 @@ const round = (x) => Math.round(x);
 //  * E/W leg crosswalk: a crossing on the side street 15-45 m east/west, within 20 m along.
 //  * Slip-lane corner: an explicitly unsignalized crossing (crossing:signals=no) out on a
 //    corner diagonal; at a signalized intersection that's a free right-turn lane.
+//  * A leg with an explicitly unmarked (or no) crossing has no crosswalk. A leg with nothing
+//    mapped is "unverified": many signals, downtown especially, have no crossings drawn in
+//    OSM yet, and a missing tag is not a missing crosswalk.
 function crossingsAt(frame, els, pos, legs) {
-  const found = new Set(), slip = new Set();
+  const found = new Set(), slip = new Set(), unmarked = new Set();
   for (const e of els) {
     const t = e.tags || {};
     const isX = (e.type === "node" && t.highway === "crossing") || (e.type === "way" && t.footway === "crossing");
-    if (!isX || t.crossing === "unmarked" || t.crossing === "no" || t["crossing:markings"] === "no") continue;
+    if (!isX) continue;
+    const marked = !(t.crossing === "unmarked" || t.crossing === "no" || t["crossing:markings"] === "no");
+    const into = marked ? found : unmarked;
     const pts = (e.type === "node" ? [e] : e.geometry).map((g) => frame.project(g.lat, g.lon));
     const dpos = pts.reduce((a, p) => a + p.pos, 0) / pts.length - pos;
     const xs = pts.map((p) => (p.side === "E" ? p.dist : -p.dist));
     const x0 = Math.min(...xs), x1 = Math.max(...xs), xm = (x0 + x1) / 2;
     if (Math.abs(dpos) > 50 || Math.min(Math.abs(x0), Math.abs(x1)) > 45) continue;
     const ns = dpos < 0 ? "N" : "S", ew = xm > 0 ? "E" : "W";
-    if (t["crossing:signals"] === "no" && Math.abs(dpos) > 15 && Math.abs(xm) > 15) slip.add(ns + ew);
-    else if (Math.abs(dpos) >= 5 && (x0 < -5 && x1 > 5 || Math.abs(xm) < 15)) found.add(ns);
-    else if (Math.abs(dpos) <= 20 && Math.abs(xm) >= 15) found.add(ew);
+    if (marked && t["crossing:signals"] === "no" && Math.abs(dpos) > 15 && Math.abs(xm) > 15) slip.add(ns + ew);
+    else if (Math.abs(dpos) >= 5 && (x0 < -5 && x1 > 5 || Math.abs(xm) < 15)) into.add(ns);
+    else if (Math.abs(dpos) <= 20 && Math.abs(xm) >= 15) into.add(ew);
   }
   return {
-    crosswalks: Object.fromEntries(legs.map((l) => [l, found.has(l)])),
+    crosswalks: Object.fromEntries(legs.map((l) => [l, found.has(l) || !unmarked.has(l)])),
+    unverifiedCrosswalks: legs.filter((l) => !found.has(l) && !unmarked.has(l)),
     slipCorners: [...slip].sort(),
   };
 }
+// Signalized intersections: group the traffic-signal nodes on the carriageways, then look at
+// the roads that join the carriageways nearby. A joining road whose far end is well east or
+// west of the centerline is a side-street leg on that side.
+function findIntersections(frame, els, carriage) {
+  const mainIds = new Set(carriage.map((w) => w.id));
+  const mainNodes = new Set(carriage.flatMap((w) => w.nodes));
+  const signals = els
+    .filter((e) => e.type === "node" && e.tags?.highway === "traffic_signals" && mainNodes.has(e.id))
+    .map((e) => frame.project(e.lat, e.lon))
+    .filter((p) => p.dist < 40 && p.pos > 0 && p.pos < frame.length)
+    .sort((a, b) => a.pos - b.pos);
+  const groups = [];
+  for (const s of signals) {
+    const g = groups.at(-1);
+    if (g && s.pos - g.at(-1).pos < CONFIG.signalGroupM) g.push(s);
+    else groups.push([s]);
+  }
+
+  // Where each side road touches the carriageways, and how far out it reaches.
+  const sideWays = els.filter((w) => w.type === "way" && !mainIds.has(w.id) && isSideRoad(w.tags) && w.nodes);
+  const joins = [];
+  for (const w of sideWays) {
+    const pts = w.geometry.map((g) => frame.project(g.lat, g.lon));
+    w.nodes.forEach((id, i) => {
+      if (!mainNodes.has(id)) return;
+      const far = pts.reduce((a, b) => (b.dist > a.dist ? b : a));
+      // Short pieces (busy junctions are split into many) can still name a leg, but only
+      // a road reaching sideRoadMinM out makes one.
+      if (far.dist >= 8) joins.push({ way: w, pos: pts[i].pos, side: far.side, reaches: far.dist >= CONFIG.sideRoadMinM });
+    });
+  }
+
+  const out = [];
+  for (const g of groups) {
+    const center = g.reduce((t, s) => t + s.pos, 0) / g.length;
+    const lo = g[0].pos - 45, hi = g.at(-1).pos + 45;
+    const near = joins.filter((j) => j.pos >= lo && j.pos <= hi);
+    const legSides = new Set(near.filter((j) => j.reaches).map((j) => j.side));
+    const here = near.filter((j) => legSides.has(j.side));
+    if (!here.length) { console.log(`  ${round(center)} m: signal with no side street (mid-block crossing?), skipped`); continue; }
+    const legs = ["N", "S"], names = {}, lanes = {};
+    for (const side of ["E", "W"]) {
+      const ws = [...new Map(here.filter((j) => j.side === side).map((j) => [j.way.id, j.way])).values()];
+      if (!ws.length) continue;
+      legs.push(side);
+      // The leg's name: the most important named road there (route number, then class), then the most common.
+      const score = (w) => (w.tags.ref ? 100 : 0) + (RANK[w.tags.highway.replace("_link", "")] || 0) * 10 + ws.filter((v) => v.tags.name === w.tags.name).length;
+      const best = ws.filter((w) => w.tags.name).sort((a, b) => score(b) - score(a))[0];
+      names[side] = best ? best.tags.name
+        : ws.some((w) => /_link$/.test(w.tags.highway)) ? "ramps"
+        : ws.some((w) => w.tags.highway === "service") ? "driveway" : "unnamed road";
+      // Lanes to cross on this leg: the widest road there (a one-way pair counts both halves).
+      const long = [...new Map(here.filter((j) => j.side === side && j.reaches).map((j) => [j.way.id, j.way])).values()];
+      const pairs = long.filter((w) => w.tags.oneway === "yes" && w.tags.name === names[side]);
+      lanes[side] = Math.max(...long.map(wayLanes),pairs.length >= 2 ? pairs.slice(0, 2).reduce((t, w) => t + wayLanes(w), 0) : 0);
+    }
+    if (legs.length === 2) continue;
+    const pos = round(here.reduce((t, j) => t + j.pos, 0) / here.length);
+    const realName = (n) => n && !["driveway", "unnamed road", "ramps"].includes(n);
+    const nameList = [...new Set([names.W, names.E].filter(realName))];
+    const name = nameList.join(" / ") || "Driveway signal";
+    const lat = frame.at(pos)[0];
+    const o = OVERRIDES.find((x) => (x.match ? x.match.test(name) : Math.abs(x.lat - lat) * 111000 < 60)) || {};
+    const id = o.id || name.toLowerCase().replace(/\b(street|avenue|road|boulevard|drive|way|lane|court|parkway|terrace)\b/g, "").replace(/[^a-z0-9]+/g, "");
+    const short = o.short || abbreviate(nameList.length > 1 ? nameList[0] : name);
+    // legNames: what you actually cross on each side, e.g. a driveway opposite a named street.
+    const legNames = Object.fromEntries(Object.entries(names).map(([s, n]) => [s, realName(n) ? abbreviate(n) : n]));
+    out.push({ id, name: o.name || abbreviate(name), ...(short !== (o.name || abbreviate(name)) ? { short } : {}), pos, legs, legNames, crossLanes: Math.max(2, ...Object.values(lanes)) });
+  }
+  // Ids must be unique; suffix repeats.
+  const seen = {};
+  for (const I of out) { seen[I.id] = (seen[I.id] || 0) + 1; if (seen[I.id] > 1) I.id += seen[I.id]; }
+  return out;
+}
+
+// Lanes a side road adds to a crossing: its lanes tag, else a guess from its class.
+function wayLanes(w) {
+  const t = w.tags, oneway = t.oneway === "yes" || t.oneway === "-1";
+  const n = parseInt(t.lanes, 10);
+  if (n > 0) return n;
+  const big = /^(primary|secondary)$/.test(t.highway);
+  return oneway ? (big ? 2 : 1) : (big ? 4 : 2);
+}
+
 const toRanges = (r) => merge(r, CONFIG.mergeGapM).map(([from, to]) => ({ from: round(from), to: round(to) })).filter((s) => s.to - s.from >= 10);
 
 async function main() {
   const [s, w, n, e] = CONFIG.bbox;
   const bb = `(${s},${w},${n},${e})`;
-  const els = await overpass(`[out:json][timeout:90];(
-    way["highway"~"^(primary|trunk)$"]["ref"~"${CONFIG.ref}"]${bb};
-    way["highway"="footway"]${bb};
-    way["highway"~"^(cycleway|path)$"]${bb};
-    node["highway"="crossing"]${bb};
-  );out tags geom;`);
-  const carriage = els.filter((x) => /^(primary|trunk)$/.test(x.tags.highway));
+  const els = await overpass(`[out:json][timeout:120];
+    way["highway"~"^(primary|trunk)$"]["ref"~"${CONFIG.ref}"]${bb}->.main;
+    node(w.main)->.mainNodes;
+    (
+      .main;
+      way(bn.mainNodes)["highway"];
+      way["highway"="footway"]${bb};
+      way["highway"~"^(cycleway|path)$"]${bb};
+      node["highway"="crossing"]${bb};
+      node.mainNodes["highway"="traffic_signals"];
+    );out body geom;`);
+  const isMain = (x) => x.type === "way" && /^(primary|trunk)$/.test(x.tags.highway) && (x.tags.ref || "").includes(CONFIG.ref);
+  const carriage = els.filter(isMain);
   console.log(`OSM ways: ${els.length} (${carriage.length} ${CONFIG.ref} carriageway pieces)`);
 
   // Centerline: at fixed latitudes (~25 m apart), find where each one-way carriageway
@@ -134,11 +250,7 @@ async function main() {
   const frame = makeFrame(line);
   console.log(`Centerline: ${line.length} points, ${round(frame.length)} m`);
 
-  const intersections = CONFIG.intersections.map(({ lat, lon, ...I }) => {
-    const p = frame.project(lat, lon);
-    if (p.dist > 40) console.warn(`  ${I.name} is ${round(p.dist)} m off the centerline; check its coordinates`);
-    return { ...I, pos: round(p.pos), ...crossingsAt(frame, els, p.pos, I.legs) };
-  });
+  const intersections = findIntersections(frame, els, carriage).map((I) => ({ ...I, ...crossingsAt(frame, els, I.pos, I.legs) }));
 
   // Sidewalks and paths: pieces of footways/paths running alongside the corridor.
   const sidewalk = { E: [], W: [] }, path = { E: [], W: [] }, lane = { E: [], W: [] }, track = { E: [], W: [] };
@@ -174,7 +286,18 @@ async function main() {
     if (cyc === "track" || cyc === "separate") track[right].push([lo, hi]);
   }
 
-  const sidewalks = { E: toRanges(sidewalk.E), W: toRanges(sidewalk.W) };
+  // A short break in the sidewalk right at a side-street leg is the crossing of that street,
+  // not a gap (wide ones, like the interchange ramps at Colonial, exceed mergeGapM).
+  const bridgeLegs = (ranges, side) => {
+    const out = [];
+    for (const r of ranges) {
+      const prev = out.at(-1), mid = prev && (prev.to + r.from) / 2;
+      if (prev && r.from - prev.to < 80 && intersections.some((I) => I.legs.includes(side) && Math.abs(I.pos - mid) < 40)) prev.to = r.to;
+      else out.push({ ...r });
+    }
+    return out;
+  };
+  const sidewalks = { E: bridgeLegs(toRanges(sidewalk.E), "E"), W: bridgeLegs(toRanges(sidewalk.W), "W") };
   const bikeFacilities = {};
   for (const side of ["E", "W"]) {
     bikeFacilities[side] = [
@@ -189,7 +312,8 @@ async function main() {
   }
   for (const I of intersections) {
     const missing = I.legs.filter((l) => !I.crosswalks[l]);
-    console.log(`  ${String(I.pos).padStart(5)} m  ${I.name}  crosswalks: ${missing.length ? "missing " + missing.join(",") : "all legs"}${I.slipCorners.length ? "  slip lanes: " + I.slipCorners.join(",") : ""}`);
+    const unk = I.unverifiedCrosswalks;
+    console.log(`  ${String(I.pos).padStart(5)} m  ${I.id.padEnd(16)} ${I.name} [${I.legs.join("")}, ${I.crossLanes} lanes]  crosswalks: ${missing.length ? "NONE on " + missing.join(",") : "all legs"}${unk.length ? " (unmapped: " + unk.join(",") + ")" : ""}${I.slipCorners.length ? "  slip lanes: " + I.slipCorners.join(",") : ""}`);
   }
 
   const out = {
